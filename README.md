@@ -25,10 +25,3 @@ This repository contains the Total Quality Management (TQM) software project for
 * **Quality Analysis:** Matplotlib / Pandas (for SQC Charts)[cite: 1]
 
 ---
-
-## Status
-* [x] Repository initialized & basic documentation[cite: 1]
-* [ ] SRS & System Architecture Flowchart[cite: 1]
-* [ ] Base CRUD Modules Development[cite: 1]
-* [ ] Q04 Security Features Integration[cite: 1]
-* [ ] Risk Analysis (FMEA) & SQC Tools (Pareto/Fishbone)[cite: 1]
