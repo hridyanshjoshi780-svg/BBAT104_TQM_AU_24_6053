@@ -104,3 +104,75 @@ def authenticate_user(username: str, password: str, expected_role: str = None) -
     log_audit_trail(username, "LOGIN_SUCCESS", f"User logged in successfully with role '{user['role']}'.", user_id=user["id"])
     return dict(user)
 
+
+def register_user(username: str, password: str, full_name: str, email: str, role: str = "student") -> dict:
+    """
+    Register a new user with input sanitization and password hashing.
+    """
+    username = validate_username(username)
+    email = validate_email(email)
+    password = validate_password(password)
+    full_name = sanitize_text(full_name)
+    if not full_name:
+        raise ValidationError("Full name cannot be empty.")
+
+    if role not in ("admin", "student"):
+        role = "student"
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Check if username or email already exists
+    cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+    if cursor.fetchone():
+        conn.close()
+        raise ValidationError(f"Username '{username}' is already taken.")
+
+    cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
+    if cursor.fetchone():
+        conn.close()
+        raise ValidationError(f"Email '{email}' is already registered.")
+
+    pw_hash, salt = hash_password(password)
+
+    cursor.execute(
+        """INSERT INTO users (username, password_hash, salt, role, full_name, email)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (username, pw_hash, salt, role, full_name, email)
+    )
+    user_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    log_audit_trail(username, "USER_REGISTERED", f"New user '{username}' registered with role '{role}'.", user_id=user_id)
+    return {"id": user_id, "username": username, "role": role, "full_name": full_name, "email": email}
+
+
+def reset_password(username: str, email: str, new_password: str) -> bool:
+    """
+    Reset user password after verifying username and registered email.
+    """
+    username = validate_username(username)
+    email = validate_email(email)
+    new_password = validate_password(new_password)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM users WHERE username = ? AND email = ?", (username, email))
+    user = cursor.fetchone()
+
+    if not user:
+        conn.close()
+        log_audit_trail(username, "PASSWORD_RESET_FAILED", f"Password reset attempted with invalid email '{email}'.")
+        raise ValidationError("No matching user found with the provided username and email.")
+
+    pw_hash, salt = hash_password(new_password)
+    cursor.execute(
+        "UPDATE users SET password_hash = ?, salt = ? WHERE id = ?",
+        (pw_hash, salt, user["id"])
+    )
+    conn.commit()
+    conn.close()
+
+    log_audit_trail(username, "PASSWORD_RESET_SUCCESS", "Password was successfully reset.", user_id=user["id"])
+    return True
