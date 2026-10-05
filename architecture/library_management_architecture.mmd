@@ -1,0 +1,67 @@
+flowchart TD
+    %% User Layer
+    subgraph UL["1. User & Access Layer"]
+        U["Library User / Administrator / Librarian"]
+        AUTH["Authentication & Access Entry Point<br/>(Role Verification & Session)"]
+        U -->|Credentials / Launch| AUTH
+    end
+
+    %% Presentation Layer
+    subgraph PL["2. Library Management Interface (CustomTkinter / GUI)"]
+        AUTH -->|Access Granted| UI["Central Library Navigation Interface"]
+        UI --> TAB_SEARCH["Catalog Search View"]
+        UI --> TAB_CIRC["Issue & Return Management View"]
+        UI --> TAB_DASH["[Q02] Central Performance & Operational Dashboard"]
+        UI --> TAB_CSV["[Q02] Bulk CSV Import Interface"]
+        UI --> TAB_REPORTS["[Q02] Analytics & Summary Reports View"]
+    end
+
+    %% Application Logic Layer
+    subgraph ALL["3. Application Logic Layer (Python Engine)"]
+        TAB_SEARCH --> SVC_SEARCH["Search & Catalog Processing Service"]
+        TAB_CIRC --> SVC_CIRC["Issue & Return Workflow Controller"]
+        TAB_DASH --> SVC_DASH["Dashboard Metric Aggregator"]
+        TAB_CSV --> SVC_CSV["[Q02] Batch CSV Parser & Validator"]
+        TAB_REPORTS --> SVC_REPORTS["[Q02] Report Generation Service"]
+    end
+
+    %% Performance Optimization Layer (Q02 Quality Focus)
+    subgraph POL["4. Performance Optimization Layer (Core Q02 Engine)"]
+        SVC_SEARCH --> OPT_SEARCH["[Q02] Fast Search Engine<br/>- Normalized Substring & Prefix Matching<br/>- In-Memory Caching of Active Queries<br/>- Selective Column Projection"]
+        SVC_CIRC --> OPT_CIRC["[Q02] Streamlined Transaction Handler<br/>- Atomic Single-Step Borrow/Return<br/>- Immediate Inventory Counter Updates"]
+        SVC_CSV --> OPT_CSV["[Q02] Fast Bulk Ingestion Pipeline<br/>- Parameterized executemany Batch Inserts<br/>- Transaction Wrap (Single Commit)"]
+        SVC_REPORTS --> OPT_REPORTS["[Q02] Optimized Aggregation Engine<br/>- Pandas Vectorized Processing<br/>- Pre-filtered Summary Pipelines"]
+        SVC_DASH --> OPT_DASH["[Q02] Real-Time Metric Aggregation<br/>- Lightweight KPI Querying<br/>- Matplotlib Visual Rendering"]
+    end
+
+    %% Database Optimization & Storage Layer
+    subgraph DBL["5. Database Layer (SQLite3 Engine)"]
+        OPT_SEARCH -->|Indexed Queries| DB_ENGINE["[Q02] Efficient Database Query Layer<br/>(Connection Pooling, Row Factory, Foreign Keys)"]
+        OPT_CIRC -->|Atomic Transactions| DB_ENGINE
+        OPT_CSV -->|Bulk Commits| DB_ENGINE
+        OPT_REPORTS -->|Aggregated Selects| DB_ENGINE
+        OPT_DASH -->|Direct Count / Range Queries| DB_ENGINE
+
+        DB_ENGINE --> T_BOOKS[("books Table<br/>Indexed: isbn, title, category")]
+        DB_ENGINE --> T_MEMBERS[("users / members Table<br/>Indexed: username, role")]
+        DB_ENGINE --> T_BORROW[("borrow_records Table<br/>Indexed: book_id, user_id, status")]
+        DB_ENGINE --> T_METRICS[("search_metrics / audit Table<br/>Indexed: timestamp, query")]
+    end
+
+    %% Response Flow
+    subgraph SRL["6. System Response & Feedback Layer"]
+        DB_ENGINE -.->|Fast Result Sets (<50ms)| ALL
+        ALL -.->|Formatted UI State & Charts| PL
+        PL -.->|Visual Confirmation & Metrics| RESP["System Response<br/>(Catalog Grid, KPI Cards, Status Prompts, Visual Charts)"]
+        RESP -.->|Instant Feedback| U
+    end
+
+    %% Class Styles
+    classDef q02Style fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#ffffff;
+    classDef defaultStyle fill:#1e293b,stroke:#475569,stroke-width:1px,color:#f8fafc;
+    classDef storageStyle fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#ffffff;
+    classDef userStyle fill:#134e4a,stroke:#2dd4bf,stroke-width:2px,color:#ffffff;
+
+    class TAB_DASH,TAB_CSV,TAB_REPORTS,SVC_CSV,SVC_REPORTS,OPT_SEARCH,OPT_CIRC,OPT_CSV,OPT_REPORTS,OPT_DASH,DB_ENGINE q02Style;
+    class T_BOOKS,T_MEMBERS,T_BORROW,T_METRICS storageStyle;
+    class U,AUTH,RESP userStyle;

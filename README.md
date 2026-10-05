@@ -18,96 +18,90 @@ The project combines software development with quality analysis techniques such 
 |---|---|
 | Roll Number | 31 |
 | Baseline Software System | Library Management System |
-| Quality Goal | Q04 |
-| Quality Goal Description | Improve Security |
+| Assigned Quality Goal | Q02 |
+| Quality Goal Description | Improve Performance |
+| Core TQM Objective | Optimize issue and return flow and catalog search speed |
 | Academic Session | 2026 to 2027 |
 | Course | BBAT104 Fundamentals of TQM |
 
+## Review 1 Project Documentation
+
+The project has completed all requirements for **Review 1** (Repository Initialization, System Architecture Flowchart, SRS Document, and Scope Definition):
+
+| Deliverable | Document Link | Description |
+|---|---|---|
+| **Software Requirements Specification** | [docs/SRS.md](docs/SRS.md) | Full 16-section SRS covering functional, non-functional, system, database, and Q02 performance requirements |
+| **Project Scope Definition** | [docs/Scope_Definition.md](docs/Scope_Definition.md) | Comprehensive In-Scope, Out-of-Scope, Boundaries, Objectives, Deliverables, and Success Criteria |
+| **System Architecture Document** | [docs/System_Architecture.md](docs/System_Architecture.md) | Detailed 6-layer architecture specification mapping all 5 Q02 performance features |
+| **Architecture Flowchart (Mermaid)** | [architecture/library_management_architecture.mmd](architecture/library_management_architecture.mmd) | Plain-text editable Mermaid source diagram |
+| **Architecture Flowchart (SVG)** | [architecture/library_management_architecture.svg](architecture/library_management_architecture.svg) | Scalable vector graphics rendering for instant browser/evaluator viewing |
+
 ## Problem Statement
 
-A library management system handles important information related to books, members, issue and return transactions and other operational activities. Improper access control, invalid input, insufficient activity tracking and weak protection of sensitive information can affect the reliability and security of the system.
+A library management system handles high volumes of book inquiries, member lookups, and circulation transactions (issue and return) daily. In traditional or baseline software systems, unindexed linear database scans, multi-step circulation updates, unoptimized report aggregations, and single-record catalog entries create operational latency bottlenecks and user interface freezes.
 
-The objective of this project is to develop a functional Library Management System while improving its security through dedicated security features and systematic quality management practices.
+The objective of this project is to develop a functional **Library Management System** while systematically improving its performance (**Q02 Improve Performance**) by optimizing the issue and return flow and catalog search speed through disciplined software architecture and Total Quality Management practices.
 
 ## Project Objectives
 
 The major objectives of the project are:
 
-1. Develop a functional Library Management System using Python.
-
-2. Implement Create, Read, Update and Delete operations for the required library data.
-
-3. Improve system security according to the assigned Quality Goal Q04.
-
-4. Implement role based access control for different categories of users.
-
-5. Provide a password reset mechanism.
-
-6. Apply input validation to prevent invalid data entry.
-
-7. Maintain an audit trail for important system activities.
-
-8. Protect sensitive information through appropriate encryption techniques.
-
-9. Identify and analyse potential software risks using FMEA.
-
-10. Apply Statistical Quality Control tools to identify and analyse software defects.
-
-11. Apply the PDCA cycle for continuous improvement.
-
-12. Maintain the project through GitHub version control and proper documentation.
+1. Develop a responsive, functional Library Management System using Python and SQLite.
+2. Implement Create, Read, Update, and Delete operations for book, member, and circulation data.
+3. Improve system performance according to the assigned Quality Goal **Q02 Improve Performance**.
+4. Optimize catalog search to achieve sub-50 ms query execution latencies (**Fast Search**).
+5. Streamline issue and return circulation transactions with atomic database operations and automatic fine calculations.
+6. Restructure the SQLite persistence layer with strategic B-Tree indexing and parameterized queries (**Efficient Database Queries**).
+7. Deploy vectorized data processing using Pandas to generate summaries in under 200 ms (**Optimized Reports**).
+8. Provide an interactive visual control center reflecting operational KPIs and latencies in real time (**Dashboard**).
+9. Implement a high-throughput batch ingestion pipeline capable of loading over 1,000 records/sec (**CSV Import**).
+10. Apply Total Quality Management tools (SIPOC, CTQ, FMEA, Pareto, Fishbone, and SQC Control Charts) to measure and continuously improve software performance.
+11. Apply the PDCA cycle for continuous quality improvement.
+12. Maintain the project through GitHub version control with professional documentation.
 
 ## Assigned Quality Goal
 
-### Q04: Improve Security
+### Q02: Improve Performance
 
-According to the project guidelines, students assigned Q04 are required to improve the security of their baseline software system.
+According to the BBAT104 project guidelines, students assigned **Q02** are required to improve the performance of their baseline software system. The core operational objective is: **Optimize issue and return flow and catalog search speed**.
 
-The suggested Q04 features are:
+The assigned Q02 features are:
 
-| Feature | Purpose |
-|---|---|
-| Role Based Login | Restrict system functionality according to user roles |
-| Password Reset | Provide a controlled mechanism for resetting user passwords |
-| Input Validation | Prevent invalid and inappropriate data from entering the system |
-| Audit Trail | Record important user and system activities |
-| Encryption | Protect sensitive information from unauthorized access |
+| Feature | Purpose | Expected Improvement |
+|---|---|---|
+| **Fast Search** | Multi-attribute substring/prefix search with selective projection | Sub-50 ms query latency for up to 10,000 catalog records |
+| **Optimized Reports** | Vectorized Pandas aggregation for overdue, inventory, and circulation summaries | Report generation under 200 ms without procedural loop delays |
+| **Dashboard** | Centralized operational overview with real-time KPI tiles and visual charts | Instant operational visibility; view switch latency under 100 ms |
+| **CSV Import** | Bulk catalog data ingestion using parameterized `executemany` batch transactions | High-speed ingestion exceeding 1,000 records per second |
+| **Efficient Database Queries** | Dedicated B-Tree indexing, row factories, and connection reuse | 60% to 80% reduction in query execution times compared to unindexed scans |
 
-All five features are incorporated into this project as the security improvement scope.
+All five features are incorporated into this project as the performance improvement scope.
 
 ## Key System Features
 
-### User Authentication
+### Fast Search (Q02 Feature)
+Provides rapid, multi-attribute substring and prefix searching across titles, authors, and ISBNs with B-Tree indexing and selective column projection to achieve sub-50 ms query latencies.
 
-The system provides a controlled login mechanism for authorized users.
+### Optimized Reports (Q02 Feature)
+Employs vectorized Pandas data processing to generate overdue, category distribution, and circulation summary reports in under 200 ms without procedural loop overhead.
 
-### Role Based Access Control
+### Performance Dashboard (Q02 Feature)
+Provides an interactive real-time visual control center displaying core operational KPIs (active loans, catalog volume, overdue books) and query latency distributions.
 
-Different users can be provided with different permissions depending on their assigned roles.
+### Bulk CSV Import (Q02 Feature)
+Enables high-throughput automated onboarding of book catalogs from CSV spreadsheets using single-transaction `executemany` batch parameterization (>1,000 records/sec).
 
-### Password Reset
+### Efficient Database Queries (Q02 Feature)
+Utilizes strategic B-Tree indexing, SQLite row factories, parameterized queries, and connection optimization to minimize database latency and prevent table lock contention.
 
-Users can follow a controlled password reset process when access credentials need to be recovered.
+### Book Issue and Return Management
+Provides a streamlined, two-click circulation workflow with atomic database transactions, instant stock counter restitution, and automatic overdue fine computation.
 
-### Input Validation
+### Book Catalog and Member Management
+Supports complete Create, Read, Update, and Delete (CRUD) operations for book bibliographic data and registered library member profiles.
 
-The system validates user input before processing or storing information in order to reduce invalid data and prevent common input related errors.
-
-### Audit Trail
-
-Important system activities are recorded so that relevant actions can be reviewed when required.
-
-### Data Protection
-
-Sensitive information is protected using appropriate encryption mechanisms.
-
-### Library Management
-
-The system provides the required operations for managing library information and transactions.
-
-### CRUD Operations
-
-The application supports Create, Read, Update and Delete operations for the required system entities.
+### User Authentication & Role Control
+Provides secure entry point verification, distinguishing permissions between system administrators, librarians, and student patrons.
 
 ## Technology Stack
 
@@ -226,9 +220,9 @@ The requirements of the Library Management System are analysed and the Software 
 
 The core Library Management System is developed with the required CRUD operations using Python and SQLite.
 
-### Step 4: Security Feature Integration
+### Step 4: Performance Feature Integration
 
-The five features associated with Quality Goal Q04 are implemented and integrated into the system.
+The five features associated with Quality Goal Q02 (Fast Search, Optimized Reports, Dashboard, CSV Import, and Efficient Database Queries) are implemented and integrated into the system.
 
 ### Step 5: Process Mapping and Risk Analysis
 
@@ -258,7 +252,7 @@ The project documentation and implementation include:
 
 4. CRUD Modules
 
-5. Five Q04 Security Features
+5. Five Q02 Performance Features
 
 6. CTQ Tree
 
@@ -296,6 +290,6 @@ Regular commits are maintained to demonstrate the development progress and versi
 
 The Library Management System demonstrates the application of software development principles together with Total Quality Management practices.
 
-The project focuses particularly on improving system security through role based login, password reset, input validation, audit trail and encryption. Quality management tools such as FMEA, SIPOC, CTQ, Pareto Analysis, Fishbone Analysis, Checksheets and PDCA are incorporated to systematically identify, analyse and improve software quality.
+The project focuses particularly on improving system performance (Q02) by optimizing the issue and return flow and catalog search speed through fast search, optimized reports, dashboard, CSV import, and efficient database queries. Quality management tools such as FMEA, SIPOC, CTQ, Pareto Analysis, Fishbone Analysis, Checksheets and PDCA are incorporated to systematically identify, analyse and improve software quality.
 
-The overall objective is to develop a functional and secure Library Management System while demonstrating the practical application of Total Quality Management principles in software development.
+The overall objective is to develop a functional, high-performance Library Management System while demonstrating the practical application of Total Quality Management principles in software development.

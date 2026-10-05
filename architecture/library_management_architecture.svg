@@ -1,0 +1,249 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 1350" width="100%" height="100%" style="background:#0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="userGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#134e4a"/>
+      <stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+    <linearGradient id="uiGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+    <linearGradient id="appGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#312e81"/>
+    </linearGradient>
+    <linearGradient id="perfGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="dbGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <linearGradient id="respGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#701a75"/>
+      <stop offset="100%" stop-color="#a21caf"/>
+    </linearGradient>
+    
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+    
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#38bdf8"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#2dd4bf"/>
+    </marker>
+    <marker id="arrowGold" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#facc15"/>
+    </marker>
+  </defs>
+
+  <!-- Title Banner -->
+  <rect x="40" y="25" width="1020" height="95" rx="12" fill="url(#headerGrad)" filter="url(#shadow)" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="550" y="62" text-anchor="middle" fill="#ffffff" font-size="23" font-weight="bold" letter-spacing="0.5">LIBRARY MANAGEMENT SYSTEM — SYSTEM ARCHITECTURE</text>
+  <text x="550" y="94" text-anchor="middle" fill="#93c5fd" font-size="14">BBAT104 Fundamentals of Total Quality Management | Quality Goal: Q02 Improve Performance | Roll No: 31</text>
+
+  <!-- LAYER 1: USER & ACCESS -->
+  <rect x="40" y="145" width="1020" height="120" rx="10" fill="#132338" stroke="#0ea5e9" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text x="60" y="172" fill="#38bdf8" font-size="14" font-weight="bold">1. USER &amp; ACCESS LAYER</text>
+  
+  <!-- User Box -->
+  <rect x="70" y="190" width="420" height="58" rx="8" fill="url(#userGrad)" stroke="#2dd4bf" stroke-width="1.2" filter="url(#shadow)"/>
+  <text x="280" y="215" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="bold">Library User / Administrator / Librarian</text>
+  <text x="280" y="235" text-anchor="middle" fill="#a7f3d0" font-size="12">Interactive Desktop Client Session</text>
+  
+  <!-- Arrow User to Auth -->
+  <line x1="490" y1="219" x2="570" y2="219" stroke="#2dd4bf" stroke-width="2.5" marker-end="url(#arrowGreen)"/>
+  
+  <!-- Auth Box -->
+  <rect x="580" y="190" width="450" height="58" rx="8" fill="url(#userGrad)" stroke="#2dd4bf" stroke-width="1.2" filter="url(#shadow)"/>
+  <text x="805" y="215" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="bold">Authentication &amp; Access Entry Point</text>
+  <text x="805" y="235" text-anchor="middle" fill="#a7f3d0" font-size="12">Role Verification &amp; Session Management</text>
+
+  <!-- Connect L1 to L2 -->
+  <line x1="805" y1="248" x2="805" y2="295" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <!-- LAYER 2: INTERFACE -->
+  <rect x="40" y="295" width="1020" height="155" rx="10" fill="#151e2e" stroke="#475569" stroke-width="1.5"/>
+  <text x="60" y="322" fill="#94a3b8" font-size="14" font-weight="bold">2. LIBRARY MANAGEMENT INTERFACE (CustomTkinter / Modern GUI)</text>
+  
+  <rect x="60" y="340" width="180" height="90" rx="8" fill="url(#uiGrad)" stroke="#64748b" stroke-width="1"/>
+  <text x="150" y="375" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">[Q02] Fast Search</text>
+  <text x="150" y="398" text-anchor="middle" fill="#cbd5e1" font-size="11">Live Catalog View</text>
+  <text x="150" y="415" text-anchor="middle" fill="#38bdf8" font-size="10">Sub-string / Prefix</text>
+
+  <rect x="255" y="340" width="180" height="90" rx="8" fill="url(#uiGrad)" stroke="#64748b" stroke-width="1"/>
+  <text x="345" y="375" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">Issue &amp; Return View</text>
+  <text x="345" y="398" text-anchor="middle" fill="#cbd5e1" font-size="11">Circulation Ops</text>
+  <text x="345" y="415" text-anchor="middle" fill="#38bdf8" font-size="10">Real-time Validation</text>
+
+  <rect x="450" y="340" width="190" height="90" rx="8" fill="url(#perfGrad)" stroke="#60a5fa" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="545" y="375" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">[Q02] Performance</text>
+  <text x="545" y="395" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">Dashboard View</text>
+  <text x="545" y="415" text-anchor="middle" fill="#bfdbfe" font-size="10">KPIs &amp; Latency Gauge</text>
+
+  <rect x="655" y="340" width="180" height="90" rx="8" fill="url(#perfGrad)" stroke="#60a5fa" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="745" y="375" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">[Q02] CSV Import</text>
+  <text x="745" y="398" text-anchor="middle" fill="#cbd5e1" font-size="11">Bulk Catalog Ingestion</text>
+  <text x="745" y="415" text-anchor="middle" fill="#bfdbfe" font-size="10">Fast Batch Pipeline</text>
+
+  <rect x="850" y="340" width="190" height="90" rx="8" fill="url(#perfGrad)" stroke="#60a5fa" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="945" y="375" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">[Q02] Optimized Reports</text>
+  <text x="945" y="398" text-anchor="middle" fill="#cbd5e1" font-size="11">Borrowing / Overdue</text>
+  <text x="945" y="415" text-anchor="middle" fill="#bfdbfe" font-size="10">Vectorized Summaries</text>
+
+  <!-- Arrows L2 to L3 -->
+  <line x1="150" y1="430" x2="150" y2="480" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="345" y1="430" x2="345" y2="480" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="545" y1="430" x2="545" y2="480" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="745" y1="430" x2="745" y2="480" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="945" y1="430" x2="945" y2="480" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- LAYER 3: APPLICATION LOGIC LAYER -->
+  <rect x="40" y="480" width="1020" height="145" rx="10" fill="#1b1c30" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="60" y="507" fill="#818cf8" font-size="14" font-weight="bold">3. APPLICATION LOGIC LAYER (Python 3 Modules)</text>
+
+  <rect x="60" y="525" width="180" height="85" rx="8" fill="url(#appGrad)" stroke="#818cf8" stroke-width="1"/>
+  <text x="150" y="555" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">Search Controller</text>
+  <text x="150" y="575" text-anchor="middle" fill="#c7d2fe" font-size="11">Query Sanitizer</text>
+  <text x="150" y="593" text-anchor="middle" fill="#93c5fd" font-size="10">&amp; Filter Orchestrator</text>
+
+  <rect x="255" y="525" width="180" height="85" rx="8" fill="url(#appGrad)" stroke="#818cf8" stroke-width="1"/>
+  <text x="345" y="555" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">Circulation Controller</text>
+  <text x="345" y="575" text-anchor="middle" fill="#c7d2fe" font-size="11">Issue / Return Rules</text>
+  <text x="345" y="593" text-anchor="middle" fill="#93c5fd" font-size="10">&amp; Fine Computation</text>
+
+  <rect x="450" y="525" width="190" height="85" rx="8" fill="url(#appGrad)" stroke="#818cf8" stroke-width="1"/>
+  <text x="545" y="555" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">Dashboard Controller</text>
+  <text x="545" y="575" text-anchor="middle" fill="#c7d2fe" font-size="11">KPI Pipeline &amp;</text>
+  <text x="545" y="593" text-anchor="middle" fill="#93c5fd" font-size="10">Matplotlib Integrator</text>
+
+  <rect x="655" y="525" width="180" height="85" rx="8" fill="url(#appGrad)" stroke="#818cf8" stroke-width="1"/>
+  <text x="745" y="555" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">CSV Import Manager</text>
+  <text x="745" y="575" text-anchor="middle" fill="#c7d2fe" font-size="11">Header Verification</text>
+  <text x="745" y="593" text-anchor="middle" fill="#93c5fd" font-size="10">&amp; Batch Validation</text>
+
+  <rect x="850" y="525" width="190" height="85" rx="8" fill="url(#appGrad)" stroke="#818cf8" stroke-width="1"/>
+  <text x="945" y="555" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">Reporting Controller</text>
+  <text x="945" y="575" text-anchor="middle" fill="#c7d2fe" font-size="11">Summary Generator</text>
+  <text x="945" y="593" text-anchor="middle" fill="#93c5fd" font-size="10">&amp; Export Pipeline</text>
+
+  <!-- Arrows L3 to L4 -->
+  <line x1="150" y1="610" x2="150" y2="660" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="345" y1="610" x2="345" y2="660" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="545" y1="610" x2="545" y2="660" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="745" y1="610" x2="745" y2="660" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="945" y1="610" x2="945" y2="660" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- LAYER 4: PERFORMANCE OPTIMIZATION LAYER -->
+  <rect x="40" y="660" width="1020" height="180" rx="10" fill="#13274f" stroke="#2563eb" stroke-width="2"/>
+  <text x="60" y="688" fill="#60a5fa" font-size="14" font-weight="bold">4. PERFORMANCE OPTIMIZATION LAYER (Core Q02 Quality Goal Focus)</text>
+
+  <rect x="60" y="705" width="180" height="115" rx="8" fill="url(#perfGrad)" stroke="#93c5fd" stroke-width="1.2" filter="url(#shadow)"/>
+  <text x="150" y="730" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">[Q02] Fast Search</text>
+  <text x="150" y="750" text-anchor="middle" fill="#bfdbfe" font-size="11">Prefix/Substring Match</text>
+  <text x="150" y="770" text-anchor="middle" fill="#bfdbfe" font-size="11">Active Query Cache</text>
+  <text x="150" y="790" text-anchor="middle" fill="#bfdbfe" font-size="11">Selective Columns</text>
+  <text x="150" y="808" text-anchor="middle" fill="#facc15" font-size="10" font-weight="bold">Target: &lt; 50 ms</text>
+
+  <rect x="255" y="705" width="180" height="115" rx="8" fill="url(#perfGrad)" stroke="#93c5fd" stroke-width="1.2" filter="url(#shadow)"/>
+  <text x="345" y="730" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">Streamlined Checkout</text>
+  <text x="345" y="750" text-anchor="middle" fill="#bfdbfe" font-size="11">Atomic Single-Step</text>
+  <text x="345" y="770" text-anchor="middle" fill="#bfdbfe" font-size="11">Fast Copy Decrement</text>
+  <text x="345" y="790" text-anchor="middle" fill="#bfdbfe" font-size="11">Eliminated Redundancy</text>
+  <text x="345" y="808" text-anchor="middle" fill="#facc15" font-size="10" font-weight="bold">Zero Inventory Lock</text>
+
+  <rect x="450" y="705" width="190" height="115" rx="8" fill="url(#perfGrad)" stroke="#93c5fd" stroke-width="1.2" filter="url(#shadow)"/>
+  <text x="545" y="730" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">[Q02] Dashboard Engine</text>
+  <text x="545" y="750" text-anchor="middle" fill="#bfdbfe" font-size="11">Aggregated Pre-counts</text>
+  <text x="545" y="770" text-anchor="middle" fill="#bfdbfe" font-size="11">Instant KPI Assembly</text>
+  <text x="545" y="790" text-anchor="middle" fill="#bfdbfe" font-size="11">Optimized UI Render</text>
+  <text x="545" y="808" text-anchor="middle" fill="#facc15" font-size="10" font-weight="bold">Target: &lt; 100 ms</text>
+
+  <rect x="655" y="705" width="180" height="115" rx="8" fill="url(#perfGrad)" stroke="#93c5fd" stroke-width="1.2" filter="url(#shadow)"/>
+  <text x="745" y="730" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">[Q02] CSV Ingestion</text>
+  <text x="745" y="750" text-anchor="middle" fill="#bfdbfe" font-size="11">executemany() Batch</text>
+  <text x="745" y="770" text-anchor="middle" fill="#bfdbfe" font-size="11">Single DB Transaction</text>
+  <text x="745" y="790" text-anchor="middle" fill="#bfdbfe" font-size="11">Fast Validation Chunk</text>
+  <text x="745" y="808" text-anchor="middle" fill="#facc15" font-size="10" font-weight="bold">1000 records/sec</text>
+
+  <rect x="850" y="705" width="190" height="115" rx="8" fill="url(#perfGrad)" stroke="#93c5fd" stroke-width="1.2" filter="url(#shadow)"/>
+  <text x="945" y="730" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">[Q02] Report Engine</text>
+  <text x="945" y="750" text-anchor="middle" fill="#bfdbfe" font-size="11">Pandas Vectorized Ops</text>
+  <text x="945" y="770" text-anchor="middle" fill="#bfdbfe" font-size="11">Filtered Projections</text>
+  <text x="945" y="790" text-anchor="middle" fill="#bfdbfe" font-size="11">Avoids Full Table Scans</text>
+  <text x="945" y="808" text-anchor="middle" fill="#facc15" font-size="10" font-weight="bold">Target: &lt; 200 ms</text>
+
+  <!-- Arrows L4 to L5 -->
+  <line x1="550" y1="840" x2="550" y2="885" stroke="#facc15" stroke-width="3" marker-end="url(#arrowGold)"/>
+
+  <!-- LAYER 5: DATABASE LAYER -->
+  <rect x="40" y="885" width="1020" height="235" rx="10" fill="#0d231a" stroke="#059669" stroke-width="2"/>
+  <text x="60" y="913" fill="#34d399" font-size="14" font-weight="bold">5. DATABASE LAYER — [Q02] EFFICIENT DATABASE QUERIES (SQLite3 Engine)</text>
+
+  <!-- Database Query Controller Sub-box -->
+  <rect x="60" y="930" width="980" height="50" rx="6" fill="#064e3b" stroke="#10b981" stroke-width="1"/>
+  <text x="550" y="952" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">[Q02] Efficient Query Execution Layer: Row Factory | Parameterized Prepared Statements | PRAGMA foreign_keys = ON</text>
+  <text x="550" y="970" text-anchor="middle" fill="#6ee7b7" font-size="11">Direct Indexed B-Tree Lookups (O(log N)) | Eliminates Unnecessary SELECT * Scans | Immediate Sub-10ms Transaction Locks</text>
+
+  <!-- Tables with Indexes -->
+  <rect x="60" y="995" width="225" height="110" rx="8" fill="url(#dbGrad)" stroke="#34d399" stroke-width="1.2"/>
+  <text x="172" y="1020" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">books Table</text>
+  <text x="172" y="1040" text-anchor="middle" fill="#a7f3d0" font-size="11">id (PK), title, author</text>
+  <text x="172" y="1058" text-anchor="middle" fill="#a7f3d0" font-size="11">isbn (UNIQUE), category</text>
+  <text x="172" y="1078" text-anchor="middle" fill="#facc15" font-size="11" font-weight="bold">INDEX (isbn, title)</text>
+  <text x="172" y="1095" text-anchor="middle" fill="#6ee7b7" font-size="10">INDEX (category)</text>
+
+  <rect x="310" y="995" width="225" height="110" rx="8" fill="url(#dbGrad)" stroke="#34d399" stroke-width="1.2"/>
+  <text x="422" y="1020" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">users Table</text>
+  <text x="422" y="1040" text-anchor="middle" fill="#a7f3d0" font-size="11">id (PK), username</text>
+  <text x="422" y="1058" text-anchor="middle" fill="#a7f3d0" font-size="11">password_hash, role</text>
+  <text x="422" y="1078" text-anchor="middle" fill="#facc15" font-size="11" font-weight="bold">INDEX (username)</text>
+  <text x="422" y="1095" text-anchor="middle" fill="#6ee7b7" font-size="10">INDEX (role)</text>
+
+  <rect x="560" y="995" width="235" height="110" rx="8" fill="url(#dbGrad)" stroke="#34d399" stroke-width="1.2"/>
+  <text x="677" y="1020" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">borrow_records Table</text>
+  <text x="677" y="1040" text-anchor="middle" fill="#a7f3d0" font-size="11">id (PK), book_id, user_id</text>
+  <text x="677" y="1058" text-anchor="middle" fill="#a7f3d0" font-size="11">borrow_date, due_date, status</text>
+  <text x="677" y="1078" text-anchor="middle" fill="#facc15" font-size="11" font-weight="bold">INDEX (book_id, status)</text>
+  <text x="677" y="1095" text-anchor="middle" fill="#6ee7b7" font-size="10">INDEX (user_id, status)</text>
+
+  <rect x="820" y="995" width="220" height="110" rx="8" fill="url(#dbGrad)" stroke="#34d399" stroke-width="1.2"/>
+  <text x="930" y="1020" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">search_metrics Table</text>
+  <text x="930" y="1040" text-anchor="middle" fill="#a7f3d0" font-size="11">id (PK), timestamp</text>
+  <text x="930" y="1058" text-anchor="middle" fill="#a7f3d0" font-size="11">duration_ms, query</text>
+  <text x="930" y="1078" text-anchor="middle" fill="#facc15" font-size="11" font-weight="bold">INDEX (timestamp)</text>
+  <text x="930" y="1095" text-anchor="middle" fill="#6ee7b7" font-size="10">SQC Quality Analysis</text>
+
+  <!-- Connect L5 to L6 (Upward / Outward response flow) -->
+  <line x1="550" y1="1120" x2="550" y2="1165" stroke="#e879f9" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <!-- LAYER 6: SYSTEM RESPONSE -->
+  <rect x="40" y="1165" width="1020" height="130" rx="10" fill="#2d1238" stroke="#c026d3" stroke-width="1.5"/>
+  <text x="60" y="1193" fill="#f0abfc" font-size="14" font-weight="bold">6. SYSTEM RESPONSE &amp; OPERATIONAL FEEDBACK</text>
+
+  <rect x="60" y="1208" width="225" height="72" rx="8" fill="url(#respGrad)" stroke="#e879f9" stroke-width="1"/>
+  <text x="172" y="1235" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">Instant Search Results</text>
+  <text x="172" y="1255" text-anchor="middle" fill="#f5d0fe" font-size="11">Data Grid Refreshed (&lt;50ms)</text>
+
+  <rect x="310" y="1208" width="225" height="72" rx="8" fill="url(#respGrad)" stroke="#e879f9" stroke-width="1"/>
+  <text x="422" y="1235" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">Issue / Return Confirm</text>
+  <text x="422" y="1255" text-anchor="middle" fill="#f5d0fe" font-size="11">Stock &amp; Fine Recalculated</text>
+
+  <rect x="560" y="1208" width="235" height="72" rx="8" fill="url(#respGrad)" stroke="#e879f9" stroke-width="1"/>
+  <text x="677" y="1235" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">Real-Time Visual Dashboard</text>
+  <text x="677" y="1255" text-anchor="middle" fill="#f5d0fe" font-size="11">Charts &amp; KPI Cards Rendered</text>
+
+  <rect x="820" y="1208" width="220" height="72" rx="8" fill="url(#respGrad)" stroke="#e879f9" stroke-width="1"/>
+  <text x="930" y="1235" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">Bulk CSV / Report Summary</text>
+  <text x="930" y="1255" text-anchor="middle" fill="#f5d0fe" font-size="11">Batch Ingest / CSV Export</text>
+
+  <!-- Footer Info -->
+  <text x="550" y="1325" text-anchor="middle" fill="#64748b" font-size="12">BBAT104 Total Quality Management — Review 1 Architectural Specification — All Q02 Performance Layers Mapped</text>
+</svg>
