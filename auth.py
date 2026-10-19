@@ -4,8 +4,12 @@ Handles Role-Based Access Control, Password Security, Input Validation, Reset, a
 """
 
 import re
+import logging
 from datetime import datetime
+import sqlite3
 from database import get_connection, hash_password, verify_password
+
+logger = logging.getLogger(__name__)
 
 
 class ValidationError(Exception):
@@ -53,6 +57,7 @@ def sanitize_text(text: str) -> str:
 
 def log_audit_trail(username: str, action: str, details: str = "", user_id: int = None):
     """Record security event or system modification into the audit trail."""
+    conn = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -62,9 +67,11 @@ def log_audit_trail(username: str, action: str, details: str = "", user_id: int 
             (username, action, details, user_id)
         )
         conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"[Audit Log Warning] Could not record audit trail: {e}")
+    except sqlite3.Error:
+        logger.exception("Could not record an audit trail entry.")
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def authenticate_user(username: str, password: str, expected_role: str = None) -> dict | None:

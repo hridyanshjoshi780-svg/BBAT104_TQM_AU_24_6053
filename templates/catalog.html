@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block title %}Catalog & Fast Search — BBAT104 Library Management System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Top Action & Search Bar Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800">
+        <div>
+            <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                <span>Book Catalog & Fast Search</span>
+                <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                    Q02 Fast Search
+                </span>
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">
+                Sub-string & prefix search across titles, authors, and ISBNs backed by B-Tree indices.
+            </p>
+        </div>
+
+        {% if session['user']['role'] == 'admin' %}
+        <div>
+            <button type="button" onclick="openAddBookModal()"
+                    class="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs transition flex items-center gap-1.5 shadow-md shadow-sky-600/30">
+                <span>➕</span> Add New Book
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Search & Filter Controls -->
+    <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl p-4 shadow-sm">
+        <form method="GET" action="{{ url_for('catalog') }}" class="grid grid-cols-1 sm:grid-cols-12 gap-3" id="searchForm">
+            <!-- Search Input -->
+            <div class="sm:col-span-5">
+                <label for="searchInput" class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Search Keywords</label>
+                <div class="relative">
+                    <input type="text" id="searchInput" name="q" value="{{ query }}"
+                           placeholder="Search Title, Author, or ISBN..."
+                           class="w-full pl-9 pr-4 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <span class="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
+                </div>
+            </div>
+
+            <!-- Category Filter -->
+            <div class="sm:col-span-3">
+                <label for="categorySelect" class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Category</label>
+                <select id="categorySelect" name="category" onchange="this.form.submit()"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <option value="All" {% if category == 'All' %}selected{% endif %}>All Categories</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Availability Filter -->
+            <div class="sm:col-span-2">
+                <label for="availabilitySelect" class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Availability</label>
+                <select id="availabilitySelect" name="availability" onchange="this.form.submit()"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <option value="All" {% if availability == 'All' %}selected{% endif %}>All Status</option>
+                    <option value="Available" {% if availability == 'Available' %}selected{% endif %}>Available Only</option>
+                    <option value="Issued" {% if availability == 'Issued' %}selected{% endif %}>Issued/Borrowed</option>
+                </select>
+            </div>
+
+            <!-- Actions -->
+            <div class="sm:col-span-2 flex items-end gap-2">
+                <button type="submit" class="w-full py-2 px-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium text-xs transition">
+                    Search
+                </button>
+                <a href="{{ url_for('catalog') }}" class="py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition text-center">
+                    Reset
+                </a>
+            </div>
+        </form>
+
+        <!-- Search Performance Badge (TQM Q02 Verification) -->
+        <div class="mt-3 pt-3 border-t border-slate-700/60 flex flex-wrap items-center justify-between text-xs text-slate-400">
+            <div>
+                Found <span class="font-bold text-white">{{ search_res.total }}</span> book(s)
+                {% if query %} matching "<span class="text-sky-300 font-medium">{{ query }}</span>"{% endif %}
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-950/60 text-cyan-300 border border-cyan-500/30 font-mono text-[11px]">
+                    <span>⚡ Query Latency:</span>
+                    <strong class="text-white">{{ search_res.duration_ms }} ms</strong>
+                </span>
+                <span class="text-[11px] {% if search_res.duration_ms <= 50.0 %}text-emerald-400{% else %}text-amber-400{% endif %} font-medium">
+                    (Target: &le; 50 ms &bull; {% if search_res.duration_ms <= 50.0 %}PASS{% else %}OPTIMIZED{% endif %})
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Catalog Table -->
+    <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-300">
+                <thead class="bg-slate-900/80 uppercase tracking-wider text-[11px] font-semibold text-slate-400 border-b border-slate-700">
+                    <tr>
+                        <th class="py-3 px-4">Title & Author</th>
+                        <th class="py-3 px-4">ISBN</th>
+                        <th class="py-3 px-4">Category</th>
+                        <th class="py-3 px-4 text-center">Stock Availability</th>
+                        <th class="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% if search_res.books %}
+                        {% for book in search_res.books %}
+                        <tr class="table-row-hover transition">
+                            <td class="py-3 px-4">
+                                <div class="font-semibold text-white text-sm">{{ book.title }}</div>
+                                <div class="text-slate-400 text-xs">by {{ book.author }}</div>
+                            </td>
+                            <td class="py-3 px-4 font-mono text-slate-300">{{ book.isbn }}</td>
+                            <td class="py-3 px-4">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                                    {{ book.category }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-center">
+                                {% if book.available_copies > 0 %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                        {{ book.available_copies }} / {{ book.total_copies }} Available
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                        All Borrowed (0 / {{ book.total_copies }})
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-4 text-right whitespace-nowrap">
+                                <div class="inline-flex items-center space-x-1.5">
+                                    <!-- Quick Issue Button -->
+                                    {% if book.available_copies > 0 %}
+                                    <a href="{{ url_for('circulation') }}?book_id={{ book.id }}"
+                                       class="px-2.5 py-1 rounded bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white transition font-medium text-[11px]">
+                                        Issue
+                                    </a>
+                                    {% endif %}
+
+                                    {% if session['user']['role'] == 'admin' %}
+                                    <!-- Edit Book -->
+                                    <button type="button"
+                                            onclick='openEditBookModal({{ book | tojson }})'
+                                            class="px-2.5 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white transition font-medium text-[11px]">
+                                        Edit
+                                    </button>
+                                    <!-- Delete / Archive Book -->
+                                    <button type="button"
+                                            onclick="confirmDeleteBook({{ book.id }}, '{{ book.title|replace('\'', '\\\'') }}')"
+                                            class="px-2.5 py-1 rounded bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white transition font-medium text-[11px]">
+                                        Delete
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="py-12 text-center text-slate-400">
+                                <div class="text-3xl mb-2">🔍</div>
+                                <div class="text-sm font-medium text-slate-300">No books found matching your criteria.</div>
+                                <div class="text-xs text-slate-500 mt-1">Try clearing filters or checking for typos.</div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        {% if search_res.total_pages > 1 %}
+        <div class="px-4 py-3 bg-slate-900/60 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <div>
+                Showing Page <span class="font-bold text-white">{{ search_res.page }}</span> of <span class="font-bold text-white">{{ search_res.total_pages }}</span>
+            </div>
+            <div class="flex items-center space-x-1">
+                {% if search_res.page > 1 %}
+                <a href="{{ url_for('catalog', q=query, category=category, availability=availability, page=search_res.page - 1) }}"
+                   class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-white transition">
+                    &larr; Prev
+                </a>
+                {% endif %}
+
+                {% for p in range(1, search_res.total_pages + 1) %}
+                    {% if p == search_res.page %}
+                    <span class="px-3 py-1 rounded bg-sky-600 text-white font-bold">{{ p }}</span>
+                    {% elif p <= 5 or p == search_res.total_pages or (p >= search_res.page - 1 and p <= search_res.page + 1) %}
+                    <a href="{{ url_for('catalog', q=query, category=category, availability=availability, page=p) }}"
+                       class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">{{ p }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if search_res.page < search_res.total_pages %}
+                <a href="{{ url_for('catalog', q=query, category=category, availability=availability, page=search_res.page + 1) }}"
+                   class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-white transition">
+                    Next &rarr;
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- Modal 1: Add New Book -->
+<div id="addBookModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-4">
+            <h3 class="text-base font-bold text-white">Add New Book to Catalog</h3>
+            <button onclick="closeAddBookModal()" class="text-slate-400 hover:text-white">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('create_book') }}" class="space-y-3 text-xs">
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Book Title *</label>
+                <input type="text" name="title" required placeholder="e.g. Total Quality Management"
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Author *</label>
+                <input type="text" name="author" required placeholder="e.g. Dale H. Besterfield"
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">ISBN (Unique) *</label>
+                <input type="text" name="isbn" required placeholder="e.g. 978-0130993069"
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white font-mono focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Category / Subject *</label>
+                <input type="text" name="category" required placeholder="e.g. Management or Computer Science"
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Total Copies *</label>
+                <input type="number" name="copies" min="1" value="1" required
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-700">
+                <button type="button" onclick="closeAddBookModal()" class="px-3 py-2 rounded bg-slate-800 text-slate-300 hover:bg-slate-700">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded bg-sky-600 hover:bg-sky-500 text-white font-semibold">Save Book</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal 2: Edit Book -->
+<div id="editBookModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-4">
+            <h3 class="text-base font-bold text-white">Edit Book Record</h3>
+            <button onclick="closeEditBookModal()" class="text-slate-400 hover:text-white">&times;</button>
+        </div>
+        <form method="POST" id="editBookForm" action="" class="space-y-3 text-xs">
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Book Title *</label>
+                <input type="text" id="edit_title" name="title" required
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Author *</label>
+                <input type="text" id="edit_author" name="author" required
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">ISBN *</label>
+                <input type="text" id="edit_isbn" name="isbn" required
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white font-mono focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Category *</label>
+                <input type="text" id="edit_category" name="category" required
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Total Copies *</label>
+                <input type="number" id="edit_copies" name="copies" min="1" required
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-700">
+                <button type="button" onclick="closeEditBookModal()" class="px-3 py-2 rounded bg-slate-800 text-slate-300 hover:bg-slate-700">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded bg-sky-600 hover:bg-sky-500 text-white font-semibold">Update Book</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal 3: Confirm Delete Book -->
+<div id="deleteBookModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-rose-500/40 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+        <h3 class="text-base font-bold text-white mb-2">Delete or Archive Book</h3>
+        <p class="text-xs text-slate-300 mb-4" id="deletePromptText">
+            Are you sure you want to remove this book?
+        </p>
+        <p class="text-[11px] text-amber-300/80 bg-amber-950/30 p-2.5 rounded border border-amber-500/20 mb-4">
+            Note: If copies of this book have previous circulation history, it will be safely archived to preserve historical records.
+        </p>
+        <form method="POST" id="deleteBookForm" action="" class="flex justify-end gap-2">
+            <button type="button" onclick="closeDeleteBookModal()" class="px-3 py-2 rounded bg-slate-800 text-slate-300 text-xs">Cancel</button>
+            <button type="submit" class="px-4 py-2 rounded bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs">Confirm Delete</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openAddBookModal() {
+        document.getElementById('addBookModal').classList.remove('hidden');
+    }
+    function closeAddBookModal() {
+        document.getElementById('addBookModal').classList.add('hidden');
+    }
+
+    function openEditBookModal(book) {
+        document.getElementById('edit_title').value = book.title;
+        document.getElementById('edit_author').value = book.author;
+        document.getElementById('edit_isbn').value = book.isbn;
+        document.getElementById('edit_category').value = book.category;
+        document.getElementById('edit_copies').value = book.total_copies;
+        document.getElementById('editBookForm').action = "/books/" + book.id + "/edit";
+        document.getElementById('editBookModal').classList.remove('hidden');
+    }
+    function closeEditBookModal() {
+        document.getElementById('editBookModal').classList.add('hidden');
+    }
+
+    function confirmDeleteBook(id, title) {
+        document.getElementById('deletePromptText').innerText = `Are you sure you want to remove "${title}"?`;
+        document.getElementById('deleteBookForm').action = "/books/" + id + "/delete";
+        document.getElementById('deleteBookModal').classList.remove('hidden');
+    }
+    function closeDeleteBookModal() {
+        document.getElementById('deleteBookModal').classList.add('hidden');
+    }
+</script>
+{% endblock %}

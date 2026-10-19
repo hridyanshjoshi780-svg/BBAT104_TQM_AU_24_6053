@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Circulation Desk — BBAT104 Library Management System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header Section -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800">
+        <div>
+            <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                <span>Circulation Desk</span>
+                <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    Two-Click Issue & Return
+                </span>
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">
+                Atomic transactions ensuring stock integrity, duplicate prevention, and automatic overdue fine computation.
+            </p>
+        </div>
+        <div class="text-xs text-slate-400 flex items-center gap-2">
+            <span class="px-2.5 py-1 rounded bg-slate-800 text-sky-400 font-mono border border-slate-700">
+                ⚡ Issue/Return Target: &le; 50 ms
+            </span>
+        </div>
+    </div>
+
+    <!-- Issue Book Panel (Collapsible / Prominent Form) -->
+    <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl p-5 shadow-sm">
+        <h2 class="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+            <span>📖</span> Quick Book Checkout (Issue)
+        </h2>
+        <form method="POST" action="{{ url_for('issue_book_route') }}" class="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs">
+            <!-- Book Selector -->
+            <div class="sm:col-span-5">
+                <label for="book_id" class="block font-semibold uppercase tracking-wider text-slate-400 mb-1">Select Available Book *</label>
+                <select id="book_id" name="book_id" required
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+                    <option value="">-- Choose Book from Catalog --</option>
+                    {% for book in available_books %}
+                    <option value="{{ book.id }}" {% if selected_book_id == book.id %}selected{% endif %}>
+                        {{ book.title }} (ISBN: {{ book.isbn }} &bull; {{ book.available_copies }} left)
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Member Selector -->
+            {% if session['user']['role'] == 'admin' %}
+            <div class="sm:col-span-4">
+                <label for="user_id" class="block font-semibold uppercase tracking-wider text-slate-400 mb-1">Select Member / Student *</label>
+                <select id="user_id" name="user_id" required
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+                    <option value="">-- Choose Registered Member --</option>
+                    {% for member in members %}
+                    <option value="{{ member.id }}" {% if session['user']['role'] == 'student' and session['user']['id'] == member.id %}selected{% endif %}>
+                        {{ member.full_name }} ({{ member.username }} &bull; {{ member.active_loans }} active)
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% else %}
+            <div class="sm:col-span-4">
+                <label class="block font-semibold uppercase tracking-wider text-slate-400 mb-1">Borrowing Member</label>
+                <div class="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white">
+                    {{ session['user']['full_name'] }} (@{{ session['user']['username'] }})
+                </div>
+                <input type="hidden" name="user_id" value="{{ session['user']['id'] }}">
+            </div>
+            {% endif %}
+
+            <!-- Loan Days -->
+            <div class="sm:col-span-1">
+                <label for="loan_days" class="block font-semibold uppercase tracking-wider text-slate-400 mb-1">Days</label>
+                <input type="number" id="loan_days" name="loan_days" min="1" max="90" value="14" required
+                       class="w-full px-2 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-center focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+
+            <!-- Submit Button -->
+            <div class="sm:col-span-2 flex items-end">
+                <button type="submit"
+                        class="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition flex items-center justify-center gap-1.5 shadow-sm">
+                    <span>⚡</span> Complete Issue
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Active Loans Table (Check-In / Return Section) -->
+    <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl overflow-hidden shadow-sm">
+        <div class="p-4 bg-slate-900/60 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <span>🔄</span> Currently Checked Out Books (Active Loans)
+                </h3>
+                <span class="text-xs text-slate-400">Total active unreturned items: <strong class="text-white">{{ active_loans|length }}</strong></span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-rose-400 font-medium">Fine Policy: $1.00 / overdue day</span>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-300">
+                <thead class="bg-slate-900/80 uppercase tracking-wider text-[11px] font-semibold text-slate-400 border-b border-slate-700">
+                    <tr>
+                        <th class="py-3 px-4">Borrower</th>
+                        <th class="py-3 px-4">Book Details</th>
+                        <th class="py-3 px-4">Borrow Date</th>
+                        <th class="py-3 px-4">Due Date</th>
+                        <th class="py-3 px-4 text-center">Status</th>
+                        <th class="py-3 px-4 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% if active_loans %}
+                        {% for loan in active_loans %}
+                        <tr class="table-row-hover transition">
+                            <td class="py-3 px-4">
+                                <div class="font-semibold text-white">{{ loan.full_name }}</div>
+                                <div class="text-[11px] text-slate-400">@{{ loan.username }}</div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="font-semibold text-white">{{ loan.title }}</div>
+                                <div class="text-[11px] font-mono text-slate-400">ISBN: {{ loan.isbn }}</div>
+                            </td>
+                            <td class="py-3 px-4 text-slate-300">{{ loan.borrow_date }}</td>
+                            <td class="py-3 px-4 font-medium text-slate-200">{{ loan.due_date }}</td>
+                            <td class="py-3 px-4 text-center">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                                    ON LOAN
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-right whitespace-nowrap">
+                                <form method="POST" action="{{ url_for('return_book_route', record_id=loan.id) }}" class="inline">
+                                    <button type="submit"
+                                            class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold transition text-xs shadow-sm">
+                                        Return Book
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="py-12 text-center text-slate-400">
+                                <div class="text-3xl mb-2">🎉</div>
+                                <div class="text-sm font-medium text-slate-300">All books are accounted for! No active unreturned loans.</div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Recent Circulation History -->
+    <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl overflow-hidden shadow-sm">
+        <div class="p-4 bg-slate-900/60 border-b border-slate-700 flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <span>📜</span> Historical Circulation Transactions
+            </h3>
+            {% if session['user']['role'] == 'admin' %}
+            <a href="{{ url_for('reports') }}?tab=circulation" class="text-xs text-sky-400 hover:text-sky-300">
+                View in Reports &rarr;
+            </a>
+            {% endif %}
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-300">
+                <thead class="bg-slate-900/80 uppercase tracking-wider text-[11px] font-semibold text-slate-400 border-b border-slate-700">
+                    <tr>
+                        <th class="py-2.5 px-4">Transaction ID</th>
+                        <th class="py-2.5 px-4">Book Title</th>
+                        <th class="py-2.5 px-4">Borrower</th>
+                        <th class="py-2.5 px-4">Borrow Date</th>
+                        <th class="py-2.5 px-4">Return Date</th>
+                        <th class="py-2.5 px-4">Status</th>
+                        <th class="py-2.5 px-4 text-right">Fine ($)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% for h in recent_history %}
+                    <tr class="table-row-hover transition text-[11px]">
+                        <td class="py-2 px-4 font-mono text-slate-400">#{{ h.id }}</td>
+                        <td class="py-2 px-4 font-medium text-white">{{ h.title }}</td>
+                        <td class="py-2 px-4 text-slate-300">{{ h.full_name }} ({{ h.username }})</td>
+                        <td class="py-2 px-4 text-slate-400">{{ h.borrow_date }}</td>
+                        <td class="py-2 px-4 text-slate-400">{{ h.return_date or 'N/A' }}</td>
+                        <td class="py-2 px-4">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-medium {% if h.status == 'RETURNED' %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30{% else %}bg-sky-500/20 text-sky-300 border border-sky-500/30{% endif %}">
+                                {{ h.status }}
+                            </span>
+                        </td>
+                        <td class="py-2 px-4 text-right font-mono {% if h.fine_amount > 0 %}text-amber-400 font-bold{% else %}text-slate-400{% endif %}">
+                            ${{ "%.2f"|format(h.fine_amount) }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

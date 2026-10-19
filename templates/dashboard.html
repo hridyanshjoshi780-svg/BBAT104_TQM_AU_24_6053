@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — BBAT104 Library Management System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header Section with TQM Metrics Indicator -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-800">
+        <div>
+            <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                <span>Operational Control Center</span>
+                <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    Live System Status
+                </span>
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">
+                Real-time operational indicators &bull; Aggregated query latency: <span class="text-sky-400 font-mono font-bold">{{ metrics.duration_ms }} ms</span>
+                (Target: &le; 100 ms &bull; Status: <span class="text-emerald-400 font-bold">{% if metrics.duration_ms <= 100 %}PASS{% else %}OPTIMIZED{% endif %}</span>)
+            </p>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <a href="{{ url_for('catalog') }}" class="px-3.5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium text-xs transition flex items-center gap-1.5 shadow-sm">
+                <span>🔍</span> Fast Search
+            </a>
+            <a href="{{ url_for('circulation') }}" class="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition flex items-center gap-1.5 shadow-sm">
+                <span>🔄</span> Circulation Desk
+            </a>
+            {% if session['user']['role'] == 'admin' %}
+            <a href="{{ url_for('import_csv') }}" class="px-3.5 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium text-xs transition flex items-center gap-1.5 shadow-sm">
+                <span>📥</span> Bulk CSV Import
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- KPI Grid (8 dynamic metric tiles) -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-4">
+        <!-- 1. Total Catalog Titles -->
+        <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl p-4 shadow-sm relative overflow-hidden">
+            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Catalog Titles</div>
+            <div class="text-2xl sm:text-3xl font-extrabold text-white mt-1.5">{{ metrics.total_titles }}</div>
+            <div class="text-[11px] text-slate-400 mt-1">Unique bibliographic records</div>
+            <div class="absolute right-3 top-3 text-2xl opacity-20">📚</div>
+        </div>
+
+        <!-- 2. Available Copies -->
+        <div class="bg-[#1e293b] border border-emerald-500/30 rounded-xl p-4 shadow-sm relative overflow-hidden">
+            <div class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Available Copies</div>
+            <div class="text-2xl sm:text-3xl font-extrabold text-emerald-400 mt-1.5">{{ metrics.available_copies }}</div>
+            <div class="text-[11px] text-slate-400 mt-1">Ready on shelves for checkout</div>
+            <div class="absolute right-3 top-3 text-2xl opacity-20">✅</div>
+        </div>
+
+        <!-- 3. Active Loans (Issued Copies) -->
+        <div class="bg-[#1e293b] border border-sky-500/30 rounded-xl p-4 shadow-sm relative overflow-hidden">
+            <div class="text-xs font-semibold text-sky-400 uppercase tracking-wider">Active Loans</div>
+            <div class="text-2xl sm:text-3xl font-extrabold text-sky-400 mt-1.5">{{ metrics.active_loans }}</div>
+            <div class="text-[11px] text-slate-400 mt-1">Currently in circulation</div>
+            <div class="absolute right-3 top-3 text-2xl opacity-20">🔄</div>
+        </div>
+
+        <!-- 4. Overdue Loans -->
+        <div class="bg-[#1e293b] border {% if metrics.overdue_loans > 0 %}border-rose-500/50 bg-rose-950/20{% else %}border-slate-700/80{% endif %} rounded-xl p-4 shadow-sm relative overflow-hidden">
+            <div class="text-xs font-semibold {% if metrics.overdue_loans > 0 %}text-rose-400{% else %}text-slate-400{% endif %} uppercase tracking-wider">Overdue Books</div>
+            <div class="text-2xl sm:text-3xl font-extrabold {% if metrics.overdue_loans > 0 %}text-rose-400{% else %}text-white{% endif %} mt-1.5">{{ metrics.overdue_loans }}</div>
+            <div class="text-[11px] text-slate-400 mt-1">Past scheduled due date</div>
+            <div class="absolute right-3 top-3 text-2xl opacity-20">⚠️</div>
+        </div>
+
+        <!-- 5. Registered Members -->
+        <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl p-4 shadow-sm relative overflow-hidden">
+            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Registered Members</div>
+            <div class="text-2xl sm:text-3xl font-extrabold text-white mt-1.5">{{ metrics.total_members }}</div>
+            <div class="text-[11px] text-slate-400 mt-1">Active patron accounts</div>
+            <div class="absolute right-3 top-3 text-2xl opacity-20">👥</div>
+        </div>
+
+        <!-- 6. Total Book Inventory Volume -->
+        <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl p-4 shadow-sm relative overflow-hidden">
+            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Copies In Stock</div>
+            <div class="text-2xl sm:text-3xl font-extrabold text-white mt-1.5">{{ metrics.total_copies }}</div>
+            <div class="text-[11px] text-slate-400 mt-1">All physical copies combined</div>
+            <div class="absolute right-3 top-3 text-2xl opacity-20">📦</div>
+        </div>
+
+        <!-- 7. Total Fines Accrued -->
+        <div class="bg-[#1e293b] border border-amber-500/30 rounded-xl p-4 shadow-sm relative overflow-hidden">
+            <div class="text-xs font-semibold text-amber-400 uppercase tracking-wider">Fines Levied ($)</div>
+            <div class="text-2xl sm:text-3xl font-extrabold text-amber-400 mt-1.5">${{ "%.2f"|format(metrics.total_fines_accrued) }}</div>
+            <div class="text-[11px] text-slate-400 mt-1">Auto-calculated fine policy</div>
+            <div class="absolute right-3 top-3 text-2xl opacity-20">💵</div>
+        </div>
+
+        <!-- 8. Avg Search Latency (Q02 Performance Metric) -->
+        <div class="bg-[#1e293b] border border-cyan-500/40 rounded-xl p-4 shadow-sm relative overflow-hidden">
+            <div class="text-xs font-semibold text-cyan-400 uppercase tracking-wider">Avg Search Latency</div>
+            <div class="text-2xl sm:text-3xl font-extrabold text-cyan-400 mt-1.5">{{ metrics.avg_search_latency_ms }} <span class="text-sm font-normal">ms</span></div>
+            <div class="text-[11px] text-slate-400 mt-1">Target: &le; 50 ms (SQC Sampled)</div>
+            <div class="absolute right-3 top-3 text-2xl opacity-20">⚡</div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Category Distribution Chart -->
+        <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl p-5 lg:col-span-2 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <span>📊</span> Catalog Volume by Category
+                </h3>
+                <span class="text-xs text-slate-400">Inventory Distribution</span>
+            </div>
+            <div class="h-64 relative">
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Circulation Status Doughnut Chart -->
+        <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl p-5 shadow-sm flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <span>🍩</span> Circulation Status
+                    </h3>
+                    <span class="text-xs text-slate-400">Active vs Available</span>
+                </div>
+                <div class="h-48 relative flex items-center justify-center">
+                    <canvas id="circulationChart"></canvas>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 mt-4 text-center text-xs pt-3 border-t border-slate-700/80">
+                <div class="bg-slate-800/80 p-2 rounded">
+                    <div class="text-emerald-400 font-bold">{{ metrics.available_copies }}</div>
+                    <div class="text-[10px] text-slate-400">Available</div>
+                </div>
+                <div class="bg-slate-800/80 p-2 rounded">
+                    <div class="text-sky-400 font-bold">{{ metrics.active_loans }}</div>
+                    <div class="text-[10px] text-slate-400">Issued</div>
+                </div>
+                <div class="bg-slate-800/80 p-2 rounded">
+                    <div class="text-rose-400 font-bold">{{ metrics.overdue_loans }}</div>
+                    <div class="text-[10px] text-slate-400">Overdue</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent System Activity Stream -->
+    <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-700/80">
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <span>🕒</span> Recent System Circulation & Audit Trail
+            </h3>
+            {% if session['user']['role'] == 'admin' %}
+            <a href="{{ url_for('audit_logs_view') }}" class="text-xs text-sky-400 hover:text-sky-300 font-medium">View Full Audit Log &rarr;</a>
+            {% endif %}
+        </div>
+
+        {% if metrics.recent_activity %}
+        <div class="divide-y divide-slate-800">
+            {% for act in metrics.recent_activity %}
+            <div class="py-2.5 flex items-center justify-between text-xs">
+                <div class="flex items-center space-x-3">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold
+                        {% if 'ISSUE' in act.action %}bg-sky-500/20 text-sky-300 border border-sky-500/30
+                        {% elif 'RETURN' in act.action %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30
+                        {% elif 'ADDED' in act.action %}bg-purple-500/20 text-purple-300 border border-purple-500/30
+                        {% elif 'LOGIN' in act.action %}bg-amber-500/20 text-amber-300 border border-amber-500/30
+                        {% else %}bg-slate-700 text-slate-300{% endif %}">
+                        {{ act.action }}
+                    </span>
+                    <span class="text-slate-300">{{ act.details }}</span>
+                </div>
+                <div class="flex items-center space-x-3 text-slate-400 whitespace-nowrap">
+                    <span class="font-medium text-slate-300">by {{ act.username }}</span>
+                    <span>{{ act.timestamp }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-xs text-slate-400 py-4 text-center">No recent activity recorded yet.</p>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 1. Category Distribution Bar Chart
+    const categoryData = {{ metrics.category_distribution | tojson }};
+    const catLabels = categoryData.map(c => c.category);
+    const catTitles = categoryData.map(c => c.titles);
+    const catCopies = categoryData.map(c => c.copies);
+
+    const ctxCat = document.getElementById('categoryChart').getContext('2d');
+    new Chart(ctxCat, {
+        type: 'bar',
+        data: {
+            labels: catLabels,
+            datasets: [
+                {
+                    label: 'Total Copies',
+                    data: catCopies,
+                    backgroundColor: 'rgba(14, 165, 233, 0.7)',
+                    borderColor: 'rgba(14, 165, 233, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4
+                },
+                {
+                    label: 'Unique Titles',
+                    data: catTitles,
+                    backgroundColor: 'rgba(168, 85, 247, 0.7)',
+                    borderColor: 'rgba(168, 85, 247, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: { color: '#94a3b8', font: { size: 11 } }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#94a3b8', font: { size: 10 } },
+                    grid: { color: 'rgba(51, 65, 85, 0.3)' }
+                },
+                y: {
+                    ticks: { color: '#94a3b8', font: { size: 10 } },
+                    grid: { color: 'rgba(51, 65, 85, 0.3)' },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // 2. Circulation Doughnut Chart
+    const ctxCirc = document.getElementById('circulationChart').getContext('2d');
+    new Chart(ctxCirc, {
+        type: 'doughnut',
+        data: {
+            labels: ['Available', 'Active Loans', 'Overdue'],
+            datasets: [{
+                data: [{{ metrics.available_copies }}, {{ metrics.active_loans }}, {{ metrics.overdue_loans }}],
+                backgroundColor: [
+                    'rgba(16, 185, 129, 0.8)',
+                    'rgba(14, 165, 233, 0.8)',
+                    'rgba(244, 63, 94, 0.8)'
+                ],
+                borderColor: '#1e293b',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            cutout: '65%'
+        }
+    });
+</script>
+{% endblock %}

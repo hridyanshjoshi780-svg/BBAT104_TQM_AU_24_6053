@@ -5,19 +5,34 @@ set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR"
 
-# Check if python3-tk is present in system
-if ! python3 -c "import tkinter" &>/dev/null; then
-    echo "=========================================================================="
-    echo " [!] NOTICE: 'python3-tk' is not yet installed on your system."
-    echo " To open the desktop GUI window, please run:"
-    echo "    sudo apt update && sudo apt install -y python3-tk"
-    echo "=========================================================================="
-    echo ""
+if [ -f "$DIR/.env" ]; then
+    set -a
+    . "$DIR/.env"
+    set +a
 fi
 
-# Run using virtual environment if it exists, otherwise system python3
-if [ -d "$DIR/.venv" ]; then
-    "$DIR/.venv/bin/python" "$DIR/app.py" "$@"
+PYTHON="$DIR/.venv/bin/python"
+if [ ! -f "$PYTHON" ]; then
+    PYTHON="python3"
+fi
+
+MODE="${1:---web}"
+
+if [ "$MODE" = "--desktop" ]; then
+    echo "=========================================================================="
+    echo " Starting BBAT104 Library Management System (Desktop GUI)..."
+    echo "=========================================================================="
+    if ! "$PYTHON" -c "import tkinter" &>/dev/null; then
+        echo " [!] NOTICE: 'python3-tk' is not installed."
+        echo " Falling back to browser web application on http://localhost:5000"
+        exec "$PYTHON" "$DIR/web_app.py"
+    else
+        exec "$PYTHON" "$DIR/app.py" "${@:2}"
+    fi
 else
-    python3 "$DIR/app.py" "$@"
+    echo "=========================================================================="
+    echo " Starting BBAT104 Library Management System (Web Application)..."
+    echo " Accessible in web browser at: http://localhost:5000"
+    echo "=========================================================================="
+    exec "$PYTHON" "$DIR/web_app.py"
 fi

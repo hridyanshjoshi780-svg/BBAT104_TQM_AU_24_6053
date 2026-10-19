@@ -766,10 +766,19 @@ def run_cli_fallback():
 def main():
     init_db()
 
+    if "--web" in sys.argv:
+        from web_app import app
+        port = int(os.environ.get("PORT", 5000))
+        print(f"Starting BBAT104 Web Interface at http://localhost:{port}")
+        app.run(host="0.0.0.0", port=port, debug=False)
+        return
+
     if not TK_AVAILABLE:
         print("\n" + "=" * 72)
         print("[!] NOTICE: Tkinter is not installed on this Python installation.")
-        print("    To launch the full graphical desktop window, please run:")
+        print("    You can run the web browser application via:")
+        print("        python3 web_app.py  OR  ./run.sh")
+        print("    Or install tkinter for desktop GUI:")
         print("        sudo apt update && sudo apt install -y python3-tk")
         print("=" * 72 + "\n")
         run_cli_fallback()

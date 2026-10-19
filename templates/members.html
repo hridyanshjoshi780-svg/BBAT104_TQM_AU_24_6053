@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}Members — BBAT104 Library Management System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800">
+        <div>
+            <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                <span>Member Management</span>
+                <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                    Patrons & Admins
+                </span>
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">
+                Registered students, library counter staff, and system administrators.
+            </p>
+        </div>
+
+        {% if session['user']['role'] == 'admin' %}
+        <div>
+            <button type="button" onclick="openAddMemberModal()"
+                    class="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs transition flex items-center gap-1.5 shadow-md shadow-sky-600/30">
+                <span>➕</span> Register New Member
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl p-4 shadow-sm">
+        <form method="GET" action="{{ url_for('members') }}" class="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs">
+            <div class="sm:col-span-8">
+                <input type="text" name="q" value="{{ query }}"
+                       placeholder="Search by Username, Full Name, or Email..."
+                       class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div class="sm:col-span-2">
+                <select name="role" onchange="this.form.submit()"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+                    <option value="All" {% if role == 'All' %}selected{% endif %}>All Roles</option>
+                    <option value="student" {% if role == 'student' %}selected{% endif %}>Students</option>
+                    <option value="admin" {% if role == 'admin' %}selected{% endif %}>Administrators</option>
+                </select>
+            </div>
+            <div class="sm:col-span-2 flex gap-2">
+                <button type="submit" class="w-full py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium">Search</button>
+                <a href="{{ url_for('members') }}" class="py-2 px-3 rounded-lg bg-slate-800 text-slate-300 text-center">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Members Table -->
+    <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-300">
+                <thead class="bg-slate-900/80 uppercase tracking-wider text-[11px] font-semibold text-slate-400 border-b border-slate-700">
+                    <tr>
+                        <th class="py-3 px-4">Member Info</th>
+                        <th class="py-3 px-4">Email</th>
+                        <th class="py-3 px-4">Role</th>
+                        <th class="py-3 px-4 text-center">Active Loans</th>
+                        <th class="py-3 px-4">Joined On</th>
+                        {% if session['user']['role'] == 'admin' %}
+                        <th class="py-3 px-4 text-right">Actions</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% if members_list %}
+                        {% for m in members_list %}
+                        <tr class="table-row-hover transition">
+                            <td class="py-3 px-4">
+                                <div class="font-semibold text-white text-sm">{{ m.full_name }}</div>
+                                <div class="text-[11px] text-slate-400">@{{ m.username }}</div>
+                            </td>
+                            <td class="py-3 px-4 font-mono text-slate-300">{{ m.email }}</td>
+                            <td class="py-3 px-4">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {% if m.role == 'admin' %}bg-purple-500/20 text-purple-300 border border-purple-500/30{% else %}bg-slate-700 text-slate-300{% endif %}">
+                                    {{ m.role|upper }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-center">
+                                {% if m.active_loans > 0 %}
+                                    <span class="px-2.5 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                        {{ m.active_loans }} active
+                                    </span>
+                                {% else %}
+                                    <span class="text-slate-500">None</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-4 text-slate-400">{{ m.created_at[:10] }}</td>
+                            {% if session['user']['role'] == 'admin' %}
+                            <td class="py-3 px-4 text-right whitespace-nowrap">
+                                <div class="inline-flex items-center space-x-1.5">
+                                    <button type="button"
+                                            onclick='openEditMemberModal({{ m | tojson }})'
+                                            class="px-2.5 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white transition font-medium text-[11px]">
+                                        Edit
+                                    </button>
+                                    <button type="button"
+                                            onclick="confirmDeleteMember({{ m.id }}, '{{ m.username }}')"
+                                            class="px-2.5 py-1 rounded bg-rose-600/20 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white transition font-medium text-[11px]">
+                                        Delete
+                                    </button>
+                                </div>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="py-12 text-center text-slate-400">
+                                No registered members found matching query.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal 1: Add Member -->
+<div id="addMemberModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-4">
+            <h3 class="text-base font-bold text-white">Register New Member</h3>
+            <button onclick="closeAddMemberModal()" class="text-slate-400 hover:text-white">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('create_member') }}" class="space-y-3 text-xs">
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Username *</label>
+                <input type="text" name="username" required placeholder="e.g. jdoe24"
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Full Name *</label>
+                <input type="text" name="full_name" required placeholder="e.g. John Doe"
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Email Address *</label>
+                <input type="email" name="email" required placeholder="e.g. jdoe@university.edu"
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Password *</label>
+                <input type="password" name="password" required placeholder="Minimum 6 characters"
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Role *</label>
+                <select name="role" class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+                    <option value="student" selected>Student (Patron)</option>
+                    <option value="admin">Administrator</option>
+                </select>
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-700">
+                <button type="button" onclick="closeAddMemberModal()" class="px-3 py-2 rounded bg-slate-800 text-slate-300 hover:bg-slate-700">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded bg-sky-600 hover:bg-sky-500 text-white font-semibold">Register Member</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal 2: Edit Member -->
+<div id="editMemberModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-4">
+            <h3 class="text-base font-bold text-white">Edit Member Profile</h3>
+            <button onclick="closeEditMemberModal()" class="text-slate-400 hover:text-white">&times;</button>
+        </div>
+        <form method="POST" id="editMemberForm" action="" class="space-y-3 text-xs">
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Full Name *</label>
+                <input type="text" id="edit_m_fullname" name="full_name" required
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Email Address *</label>
+                <input type="email" id="edit_m_email" name="email" required
+                       class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Role *</label>
+                <select id="edit_m_role" name="role" class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:ring-1 focus:ring-sky-500 focus:outline-none">
+                    <option value="student">Student (Patron)</option>
+                    <option value="admin">Administrator</option>
+                </select>
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-700">
+                <button type="button" onclick="closeEditMemberModal()" class="px-3 py-2 rounded bg-slate-800 text-slate-300 hover:bg-slate-700">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded bg-sky-600 hover:bg-sky-500 text-white font-semibold">Update Member</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal 3: Confirm Delete Member -->
+<div id="deleteMemberModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-rose-500/40 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+        <h3 class="text-base font-bold text-white mb-2">Delete or Archive Member</h3>
+        <p class="text-xs text-slate-300 mb-4" id="deleteMemberPrompt">
+            Are you sure you want to remove this member?
+        </p>
+        <p class="text-[11px] text-amber-300/80 bg-amber-950/30 p-2.5 rounded border border-amber-500/20 mb-4">
+            Safety Guard: The system will strictly reject deletion if this member has unreturned borrowed books.
+        </p>
+        <form method="POST" id="deleteMemberForm" action="" class="flex justify-end gap-2">
+            <button type="button" onclick="closeDeleteMemberModal()" class="px-3 py-2 rounded bg-slate-800 text-slate-300 text-xs">Cancel</button>
+            <button type="submit" class="px-4 py-2 rounded bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs">Confirm Delete</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openAddMemberModal() {
+        document.getElementById('addMemberModal').classList.remove('hidden');
+    }
+    function closeAddMemberModal() {
+        document.getElementById('addMemberModal').classList.add('hidden');
+    }
+
+    function openEditMemberModal(m) {
+        document.getElementById('edit_m_fullname').value = m.full_name;
+        document.getElementById('edit_m_email').value = m.email;
+        document.getElementById('edit_m_role').value = m.role;
+        document.getElementById('editMemberForm').action = "/members/" + m.id + "/edit";
+        document.getElementById('editMemberModal').classList.remove('hidden');
+    }
+    function closeEditMemberModal() {
+        document.getElementById('editMemberModal').classList.add('hidden');
+    }
+
+    function confirmDeleteMember(id, username) {
+        document.getElementById('deleteMemberPrompt').innerText = `Are you sure you want to remove member "${username}"?`;
+        document.getElementById('deleteMemberForm').action = "/members/" + id + "/delete";
+        document.getElementById('deleteMemberModal').classList.remove('hidden');
+    }
+    function closeDeleteMemberModal() {
+        document.getElementById('deleteMemberModal').classList.add('hidden');
+    }
+</script>
+{% endblock %}

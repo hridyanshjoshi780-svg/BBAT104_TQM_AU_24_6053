@@ -7,8 +7,8 @@ flowchart TD
     end
 
     %% Presentation Layer
-    subgraph PL["2. Library Management Interface (CustomTkinter / GUI)"]
-        AUTH -->|Access Granted| UI["Central Library Navigation Interface"]
+    subgraph PL["2. Library Management Presentation Layer (Web Browser & Desktop GUI)"]
+        AUTH -->|Access Granted| UI["Central Library Navigation Interface (HTML5/Tailwind/Flask & Tkinter)"]
         UI --> TAB_SEARCH["Catalog Search View"]
         UI --> TAB_CIRC["Issue & Return Management View"]
         UI --> TAB_DASH["[Q02] Central Performance & Operational Dashboard"]
@@ -27,16 +27,16 @@ flowchart TD
 
     %% Performance Optimization Layer (Q02 Quality Focus)
     subgraph POL["4. Performance Optimization Layer (Core Q02 Engine)"]
-        SVC_SEARCH --> OPT_SEARCH["[Q02] Fast Search Engine<br/>- Normalized Substring & Prefix Matching<br/>- In-Memory Caching of Active Queries<br/>- Selective Column Projection"]
+        SVC_SEARCH -->         OPT_SEARCH["[Q02] Fast Search Engine<br/>- FTS5 Trigram Substring Matching<br/>- LIKE Fallback for Short Queries<br/>- Selective Column Projection"]
         SVC_CIRC --> OPT_CIRC["[Q02] Streamlined Transaction Handler<br/>- Atomic Single-Step Borrow/Return<br/>- Immediate Inventory Counter Updates"]
         SVC_CSV --> OPT_CSV["[Q02] Fast Bulk Ingestion Pipeline<br/>- Parameterized executemany Batch Inserts<br/>- Transaction Wrap (Single Commit)"]
-        SVC_REPORTS --> OPT_REPORTS["[Q02] Optimized Aggregation Engine<br/>- Pandas Vectorized Processing<br/>- Pre-filtered Summary Pipelines"]
-        SVC_DASH --> OPT_DASH["[Q02] Real-Time Metric Aggregation<br/>- Lightweight KPI Querying<br/>- Matplotlib Visual Rendering"]
+        SVC_REPORTS -->         OPT_REPORTS["[Q02] Optimized Aggregation Engine<br/>- SQL Aggregation and Pandas Processing<br/>- Pre-filtered Summary Pipelines"]
+        SVC_DASH --> OPT_DASH["[Q02] Real-Time Metric Aggregation<br/>- Consistent Snapshot KPI Queries<br/>- Chart.js Browser Rendering"]
     end
 
     %% Database Optimization & Storage Layer
     subgraph DBL["5. Database Layer (SQLite3 Engine)"]
-        OPT_SEARCH -->|Indexed Queries| DB_ENGINE["[Q02] Efficient Database Query Layer<br/>(Connection Pooling, Row Factory, Foreign Keys)"]
+        OPT_SEARCH -->|Indexed Queries| DB_ENGINE["[Q02] Efficient Database Query Layer<br/>(Short-Lived Connections, WAL, Row Factory, Foreign Keys)"]
         OPT_CIRC -->|Atomic Transactions| DB_ENGINE
         OPT_CSV -->|Bulk Commits| DB_ENGINE
         OPT_REPORTS -->|Aggregated Selects| DB_ENGINE
