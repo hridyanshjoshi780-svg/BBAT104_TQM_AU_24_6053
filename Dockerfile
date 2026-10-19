@@ -16,6 +16,7 @@ COPY . .
 
 # Ensure data directory or database initialization
 ENV PORT=5000
+ENV APP_ENV=production
 ENV FLASK_DEBUG=0
 ENV PYTHONUNBUFFERED=1
 

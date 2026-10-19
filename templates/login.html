@@ -33,6 +33,7 @@
             </button>
         </form>
 
+        {% if demo_accounts_enabled %}
         <!-- Evaluation Quick Login Shortcuts -->
         <div class="mt-6 pt-5 border-t border-slate-700/80">
             <p class="text-xs text-slate-400 text-center mb-2.5 font-medium">Evaluation Demo Accounts:</p>
@@ -49,6 +50,7 @@
                 </button>
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

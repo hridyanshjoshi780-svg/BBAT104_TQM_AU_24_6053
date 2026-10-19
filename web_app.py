@@ -12,6 +12,7 @@ Provides browser-accessible interface and REST API endpoints for:
 """
 
 import os
+import secrets
 import time
 from functools import wraps
 from flask import (
@@ -37,13 +38,14 @@ from library_service import (
 
 # Initialize Flask application
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "bbat104-tqm-library-secret-key-session-2026")
+app_environment = os.environ.get("APP_ENV", "development").strip().lower()
+secret_key = os.environ.get("SECRET_KEY")
+if app_environment == "production" and (not secret_key or len(secret_key) < 32):
+    raise RuntimeError("Production SECRET_KEY must be configured with at least 32 characters.")
+app.secret_key = secret_key or secrets.token_urlsafe(32)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-
-# Auto-initialize database on application startup
-with app.app_context():
-    init_db()
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
 
 # =============================================================================
@@ -73,7 +75,10 @@ def admin_required(f):
 
 @app.context_processor
 def inject_active_page():
-    return dict(active_page=request.endpoint)
+    return dict(
+        active_page=request.endpoint,
+        demo_accounts_enabled=app_environment != "production"
+    )
 
 
 # =============================================================================
@@ -138,7 +143,7 @@ def catalog():
     query = request.args.get("q", "").strip()
     category = request.args.get("category", "All")
     availability = request.args.get("availability", "All")
-    page = int(request.args.get("page", 1))
+    page = request.args.get("page", 1, type=int) or 1
 
     search_res = search_books_paginated(
         query=query,
@@ -181,8 +186,9 @@ def create_book():
         flash(f"Book '{title}' successfully added to catalog.", "success")
     except ValidationError as e:
         flash(str(e), "error")
-    except Exception as e:
-        flash(f"An unexpected error occurred: {str(e)}", "error")
+    except Exception:
+        app.logger.exception("Book creation failed")
+        flash("An unexpected error occurred while adding the book.", "error")
 
     return redirect(url_for("catalog"))
 
@@ -210,8 +216,9 @@ def edit_book(book_id):
         flash(f"Book '{title}' updated successfully.", "success")
     except ValidationError as e:
         flash(str(e), "error")
-    except Exception as e:
-        flash(f"Update failed: {str(e)}", "error")
+    except Exception:
+        app.logger.exception("Book update failed")
+        flash("An unexpected error occurred while updating the book.", "error")
 
     return redirect(url_for("catalog"))
 
@@ -225,8 +232,9 @@ def remove_book(book_id):
         flash(f"Book '{res['title']}' was {res['status']}.", "success")
     except ValidationError as e:
         flash(str(e), "error")
-    except Exception as e:
-        flash(f"Could not delete book: {str(e)}", "error")
+    except Exception:
+        app.logger.exception("Book deletion failed")
+        flash("An unexpected error occurred while deleting the book.", "error")
 
     return redirect(url_for("catalog"))
 
@@ -238,6 +246,7 @@ def remove_book(book_id):
 @app.route("/circulation")
 @login_required
 def circulation():
+    current_user = session["user"]
     selected_book_id = request.args.get("book_id", type=int)
 
     # Fetch books with available copies for checkout
@@ -252,9 +261,14 @@ def circulation():
     available_books = [dict(r) for r in cursor.fetchall()]
     conn.close()
 
-    members, _ = get_all_members(limit=500)
-    active_loans = get_active_loans()
-    recent_history = get_borrow_records(limit=25)
+    if current_user["role"] == "admin":
+        members, _ = get_all_members(limit=500)
+        active_loans = get_active_loans()
+        recent_history = get_borrow_records(limit=25)
+    else:
+        members = []
+        active_loans = get_active_loans(user_id=current_user["id"])
+        recent_history = get_borrow_records(user_id=current_user["id"], limit=25)
 
     return render_template(
         "circulation.html",
@@ -271,6 +285,8 @@ def circulation():
 def issue_book_route():
     book_id = request.form.get("book_id", type=int)
     user_id = request.form.get("user_id", type=int)
+    if session["user"]["role"] != "admin":
+        user_id = session["user"]["id"]
     loan_days = request.form.get("loan_days", 14, type=int)
 
     try:
@@ -287,8 +303,9 @@ def issue_book_route():
         )
     except ValidationError as e:
         flash(str(e), "error")
-    except Exception as e:
-        flash(f"Failed to issue book: {str(e)}", "error")
+    except Exception:
+        app.logger.exception("Book issue failed")
+        flash("An unexpected error occurred while issuing the book.", "error")
 
     return redirect(url_for("circulation"))
 
@@ -297,7 +314,14 @@ def issue_book_route():
 @login_required
 def return_book_route(record_id):
     try:
-        res = return_book(record_id=record_id, username=session["user"]["username"])
+        borrower_user_id = (
+            None if session["user"]["role"] == "admin" else session["user"]["id"]
+        )
+        res = return_book(
+            record_id=record_id,
+            username=session["user"]["username"],
+            borrower_user_id=borrower_user_id
+        )
         fine_text = f" Overdue Fine Levied: ${res['fine']:.2f}" if res["fine"] > 0 else " No fines applicable."
         flash(
             f"Returned '{res['title']}' successfully in {res['duration_ms']} ms.{fine_text}",
@@ -305,8 +329,9 @@ def return_book_route(record_id):
         )
     except ValidationError as e:
         flash(str(e), "error")
-    except Exception as e:
-        flash(f"Failed to return book: {str(e)}", "error")
+    except Exception:
+        app.logger.exception("Book return failed")
+        flash("An unexpected error occurred while returning the book.", "error")
 
     return redirect(url_for("circulation"))
 
@@ -317,6 +342,7 @@ def return_book_route(record_id):
 
 @app.route("/members")
 @login_required
+@admin_required
 def members():
     query = request.args.get("q", "").strip()
     role = request.args.get("role", "All")
@@ -353,8 +379,9 @@ def create_member():
         flash(f"Member '{username}' successfully registered.", "success")
     except ValidationError as e:
         flash(str(e), "error")
-    except Exception as e:
-        flash(f"Failed to register member: {str(e)}", "error")
+    except Exception:
+        app.logger.exception("Member registration failed")
+        flash("An unexpected error occurred while registering the member.", "error")
 
     return redirect(url_for("members"))
 
@@ -378,8 +405,9 @@ def edit_member(user_id):
         flash("Member details updated successfully.", "success")
     except ValidationError as e:
         flash(str(e), "error")
-    except Exception as e:
-        flash(f"Failed to update member: {str(e)}", "error")
+    except Exception:
+        app.logger.exception("Member update failed")
+        flash("An unexpected error occurred while updating the member.", "error")
 
     return redirect(url_for("members"))
 
@@ -393,8 +421,9 @@ def remove_member(user_id):
         flash(f"Member '{res['username']}' was {res['status']}.", "success")
     except ValidationError as e:
         flash(str(e), "error")
-    except Exception as e:
-        flash(f"Could not delete member: {str(e)}", "error")
+    except Exception:
+        app.logger.exception("Member deletion failed")
+        flash("An unexpected error occurred while deleting the member.", "error")
 
     return redirect(url_for("members"))
 
@@ -405,6 +434,7 @@ def remove_member(user_id):
 
 @app.route("/reports")
 @login_required
+@admin_required
 def reports():
     report_type = request.args.get("type", "inventory")
     category = request.args.get("category", "All")
@@ -444,6 +474,7 @@ def reports():
 
 @app.route("/reports/export")
 @login_required
+@admin_required
 def export_report_csv_route():
     report_type = request.args.get("type", "inventory")
     category = request.args.get("category", "All")
@@ -462,8 +493,9 @@ def export_report_csv_route():
             mimetype="text/csv",
             headers={"Content-Disposition": f"attachment; filename=library_{report_type}_report.csv"}
         )
-    except Exception as e:
-        flash(f"CSV export failed: {str(e)}", "error")
+    except Exception:
+        app.logger.exception("CSV export failed")
+        flash("An unexpected error occurred while exporting the report.", "error")
         return redirect(url_for("reports"))
 
 
@@ -487,7 +519,7 @@ def upload_csv_route():
         return redirect(url_for("import_csv"))
 
     file = request.files["csv_file"]
-    if not file.filename.lower().endswith(".csv"):
+    if not file.filename or not file.filename.lower().endswith(".csv"):
         flash("Invalid file format. Please upload a standard comma-separated .csv file.", "error")
         return redirect(url_for("import_csv"))
 
@@ -509,8 +541,9 @@ def upload_csv_route():
     except UnicodeDecodeError:
         flash("File encoding error: Please ensure the CSV is saved with UTF-8 encoding.", "error")
         return redirect(url_for("import_csv"))
-    except Exception as e:
-        flash(f"Unexpected error during import: {str(e)}", "error")
+    except Exception:
+        app.logger.exception("CSV import failed")
+        flash("An unexpected error occurred while importing the CSV file.", "error")
         return redirect(url_for("import_csv"))
 
 
@@ -552,8 +585,9 @@ def health_check():
         total_books = cur.fetchone()["cnt"]
         conn.close()
         db_status = "connected"
-    except Exception as e:
-        db_status = f"error: {str(e)}"
+    except Exception:
+        app.logger.error("Database health check failed")
+        db_status = "error"
 
     return jsonify({
         "status": "healthy" if db_status == "connected" else "degraded",
@@ -571,6 +605,7 @@ def health_check():
 # =============================================================================
 
 if __name__ == "__main__":
+    init_db()
     port = int(os.environ.get("PORT", 5000))
     host = os.environ.get("HOST", "0.0.0.0")
     debug = os.environ.get("FLASK_DEBUG", "0") == "1"

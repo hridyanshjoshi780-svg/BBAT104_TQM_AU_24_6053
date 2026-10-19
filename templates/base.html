@@ -83,13 +83,13 @@
                     <a href="{{ url_for('circulation') }}" class="px-3 py-1.5 rounded-lg text-sm font-medium transition {% if active_page == 'circulation' %}bg-sky-600 text-white{% else %}text-slate-300 hover:text-white hover:bg-slate-800{% endif %}">
                         🔄 Issue & Return
                     </a>
+                    {% if session['user']['role'] == 'admin' %}
                     <a href="{{ url_for('members') }}" class="px-3 py-1.5 rounded-lg text-sm font-medium transition {% if active_page == 'members' %}bg-sky-600 text-white{% else %}text-slate-300 hover:text-white hover:bg-slate-800{% endif %}">
                         👥 Members
                     </a>
                     <a href="{{ url_for('reports') }}" class="px-3 py-1.5 rounded-lg text-sm font-medium transition {% if active_page == 'reports' %}bg-sky-600 text-white{% else %}text-slate-300 hover:text-white hover:bg-slate-800{% endif %}">
                         📈 Reports
                     </a>
-                    {% if session['user']['role'] == 'admin' %}
                     <a href="{{ url_for('import_csv') }}" class="px-3 py-1.5 rounded-lg text-sm font-medium transition {% if active_page == 'import_csv' %}bg-sky-600 text-white{% else %}text-slate-300 hover:text-white hover:bg-slate-800{% endif %}">
                         📥 CSV Import
                     </a>
@@ -125,9 +125,9 @@
             <a href="{{ url_for('dashboard') }}" class="whitespace-nowrap px-2.5 py-1 rounded {% if active_page == 'dashboard' %}bg-sky-600 text-white{% else %}text-slate-300{% endif %}">Dashboard</a>
             <a href="{{ url_for('catalog') }}" class="whitespace-nowrap px-2.5 py-1 rounded {% if active_page == 'catalog' %}bg-sky-600 text-white{% else %}text-slate-300{% endif %}">Catalog</a>
             <a href="{{ url_for('circulation') }}" class="whitespace-nowrap px-2.5 py-1 rounded {% if active_page == 'circulation' %}bg-sky-600 text-white{% else %}text-slate-300{% endif %}">Circulation</a>
+            {% if session['user']['role'] == 'admin' %}
             <a href="{{ url_for('members') }}" class="whitespace-nowrap px-2.5 py-1 rounded {% if active_page == 'members' %}bg-sky-600 text-white{% else %}text-slate-300{% endif %}">Members</a>
             <a href="{{ url_for('reports') }}" class="whitespace-nowrap px-2.5 py-1 rounded {% if active_page == 'reports' %}bg-sky-600 text-white{% else %}text-slate-300{% endif %}">Reports</a>
-            {% if session['user']['role'] == 'admin' %}
             <a href="{{ url_for('import_csv') }}" class="whitespace-nowrap px-2.5 py-1 rounded {% if active_page == 'import_csv' %}bg-sky-600 text-white{% else %}text-slate-300{% endif %}">CSV Import</a>
             <a href="{{ url_for('audit_logs_view') }}" class="whitespace-nowrap px-2.5 py-1 rounded {% if active_page == 'audit' %}bg-sky-600 text-white{% else %}text-slate-300{% endif %}">Audit</a>
             {% endif %}

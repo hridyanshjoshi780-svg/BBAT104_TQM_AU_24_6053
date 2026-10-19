@@ -7,9 +7,13 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     envVars:
+      - key: APP_ENV
+        value: production
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_PASSWORD
         generateValue: true
       - key: FLASK_DEBUG
         value: "0"
