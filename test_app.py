@@ -18,10 +18,14 @@ Uses an isolated temporary database to guarantee zero disruption to the user's l
 
 import os
 import tempfile
+import subprocess
+import sys
 import unittest
 import csv
 import io
 import time
+from datetime import datetime, timedelta
+from unittest.mock import patch
 
 from database import init_db, get_connection, explain_query
 from auth import (
@@ -51,6 +55,7 @@ class TestLibraryManagementSystemReview2(unittest.TestCase):
         # Create an isolated temporary SQLite database
         cls.temp_dir = tempfile.TemporaryDirectory()
         cls.test_db_path = os.path.join(cls.temp_dir.name, "test_library.db")
+        cls.original_database_path = os.environ.get("DATABASE_PATH")
         os.environ["DATABASE_PATH"] = cls.test_db_path
         init_db(cls.test_db_path)
 
@@ -61,7 +66,10 @@ class TestLibraryManagementSystemReview2(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        os.environ.pop("DATABASE_PATH", None)
+        if cls.original_database_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = cls.original_database_path
         cls.temp_dir.cleanup()
 
     # -------------------------------------------------------------------------
@@ -254,9 +262,10 @@ class TestLibraryManagementSystemReview2(unittest.TestCase):
         plan = explain_catalog_search("Total Quality", category="Management")
         self.assertIsInstance(plan, list)
         self.assertGreater(len(plan), 0)
-        # Verify plan contains search execution details
         details = [str(step.get("detail", "")) for step in plan]
-        self.assertTrue(any("SCAN" in d or "SEARCH" in d or "INDEX" in d for d in details))
+        self.assertTrue(any("VIRTUAL TABLE INDEX" in d for d in details))
+        category_plan = explain_catalog_search(category="Management")
+        self.assertTrue(any("idx_books_category" in str(step.get("detail", "")) for step in category_plan))
 
     # -------------------------------------------------------------------------
     # 5. Q02 ISSUE AND RETURN CIRCULATION (Phase Five & Feature 5)
@@ -411,6 +420,7 @@ class TestLibraryManagementSystemReview2(unittest.TestCase):
             "title,author,isbn,category,copies",
             "Duplicate Book,Duplicate Author,978-0073383095,Mathematics,2", # Already imported above
             ",Missing Title,978-1111111111,Category,2",                     # Malformed row: missing title
+            "Invalid Copies,Invalid Author,978-1111111112,Category,not-a-number",
             "Fresh New Book,Fresh Author,978-2222222222,Engineering,3"       # Valid row
         ]
         csv_text = "\n".join(csv_rows)
@@ -418,7 +428,8 @@ class TestLibraryManagementSystemReview2(unittest.TestCase):
         summary = import_books_from_csv(csv_text, admin_user="admin")
         self.assertEqual(summary["inserted"], 1)
         self.assertEqual(summary["skipped_count"], 1)
-        self.assertEqual(summary["failed_count"], 1)
+        self.assertEqual(summary["failed_count"], 2)
+        self.assertTrue(any("positive integer" in row["reason"] for row in summary["errors"]))
 
     def test_22_bulk_csv_import_invalid_headers_rejection(self):
         bad_csv = "random_col_1,random_col_2\nval1,val2"
@@ -505,6 +516,171 @@ class TestLibraryManagementSystemReview2(unittest.TestCase):
         audit_resp = self.client.get("/audit")
         self.assertEqual(audit_resp.status_code, 200)
         self.assertIn(b"Audit Trail", audit_resp.data)
+
+    def test_26_production_initialization_uses_configured_admin_only(self):
+        production_db = os.path.join(self.temp_dir.name, "production_library.db")
+        production_password = "production-admin-secret-2026"
+        with patch.dict(os.environ, {
+            "APP_ENV": "production",
+            "ADMIN_PASSWORD": production_password,
+            "DATABASE_PATH": production_db
+        }):
+            init_db(production_db)
+            admin = authenticate_user("admin", production_password)
+            self.assertIsNotNone(admin)
+            self.assertIsNone(authenticate_user("admin", "admin123"))
+            self.assertIsNone(authenticate_user("student1", "student123"))
+
+    def test_27_web_app_import_does_not_initialize_database(self):
+        import_db = os.path.join(self.temp_dir.name, "import_only.db")
+        env = os.environ.copy()
+        env["DATABASE_PATH"] = import_db
+        env["APP_ENV"] = "development"
+        env.pop("SECRET_KEY", None)
+        subprocess.run(
+            [sys.executable, "-c", "import web_app"],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            env=env,
+            check=True,
+            capture_output=True
+        )
+        self.assertFalse(os.path.exists(import_db))
+
+    def test_production_web_requires_a_configured_secret(self):
+        env = os.environ.copy()
+        env["APP_ENV"] = "production"
+        env.pop("SECRET_KEY", None)
+        result = subprocess.run(
+            [sys.executable, "-c", "import web_app"],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            env=env,
+            capture_output=True,
+            text=True
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SECRET_KEY", result.stderr)
+
+    def test_28_search_index_tracks_book_changes(self):
+        book = add_book("Trigram Search Fixture", "Search Author", "978-3333333333", "Testing", 1, "admin")
+        found, _ = search_books(query="gram sea")
+        self.assertTrue(any(row["id"] == book["id"] for row in found))
+
+        update_book(
+            book["id"], "Updated Trigram Fixture", "Search Author",
+            book["isbn"], "Testing", 1, "admin"
+        )
+        found, _ = search_books(query="gram sea")
+        self.assertFalse(any(row["id"] == book["id"] for row in found))
+        found, _ = search_books(query="updated trig")
+        self.assertTrue(any(row["id"] == book["id"] for row in found))
+
+        delete_book(book["id"], "admin")
+        found, _ = search_books(query="updated trig")
+        self.assertFalse(any(row["id"] == book["id"] for row in found))
+
+    def test_29_loan_duration_is_bounded(self):
+        for loan_days in (0, -1, 91):
+            with self.subTest(loan_days=loan_days):
+                with self.assertRaises(ValidationError):
+                    issue_book(1, 2, "admin", loan_days=loan_days)
+
+    def test_30_overdue_report_fine_matches_return_amount(self):
+        conn = get_connection()
+        cursor = conn.cursor()
+        due_date = (datetime.now() - timedelta(days=1, hours=12)).strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute(
+            """INSERT INTO borrow_records (book_id, user_id, due_date, status)
+               VALUES (1, 2, ?, 'BORROWED')""",
+            (due_date,)
+        )
+        record_id = cursor.lastrowid
+        cursor.execute("UPDATE books SET available_copies = available_copies - 1 WHERE id = 1")
+        conn.commit()
+        conn.close()
+
+        report_row = next(
+            row for row in get_report_overdue_books()
+            if row["record_id"] == record_id
+        )
+        returned = return_book(record_id, "admin")
+        self.assertEqual(report_row["estimated_fine"], returned["fine"])
+
+    def test_31_csv_import_bom_row_limit_and_formula_export(self):
+        summary = import_books_from_csv(
+            "\ufefftitle,author,isbn,category,copies\nBOM Fixture,CSV Author,978-4444444444,Testing,2",
+            admin_user="admin"
+        )
+        self.assertEqual(summary["inserted"], 1)
+
+        oversized_batch = (
+            "title,author,isbn,category,copies\n"
+            "One,Author,978-5555555551,Testing,1\n"
+            "Two,Author,978-5555555552,Testing,1"
+        )
+        with self.assertRaises(ValidationError):
+            import_books_from_csv(oversized_batch, admin_user="admin", max_rows=1)
+        missing, _ = search_books(query="978-5555555552")
+        self.assertEqual(missing, [])
+
+        formula_batch = (
+            "title,author,isbn,category,copies\n"
+            'Formula Fixture,CSV Author,978-6666666666,"=HYPERLINK(""https://example.invalid"")",1'
+        )
+        import_books_from_csv(formula_batch, admin_user="admin")
+        exported = csv.DictReader(io.StringIO(export_report_to_csv("inventory")))
+        categories = [row["category"] for row in exported]
+        self.assertTrue(any(value.startswith("'=") for value in categories))
+
+    def test_32_student_access_is_limited_to_own_circulation(self):
+        student = authenticate_user("student1", "student123")
+        self.assertIsNotNone(student)
+        other = register_user(
+            "other_member",
+            "securePass123",
+            "Other Member",
+            "other_member@unit.edu"
+        )
+        student_book = add_book("Student Own Fixture", "Author", "978-7777777771", "Testing", 1, "admin")
+        other_book = add_book("Other Member Fixture", "Author", "978-7777777772", "Testing", 1, "admin")
+
+        with self.client.session_transaction() as sess:
+            sess["user"] = {
+                "id": student["id"],
+                "username": student["username"],
+                "full_name": student["full_name"],
+                "email": student["email"],
+                "role": student["role"]
+            }
+
+        for path in ("/members", "/reports", "/reports/export?type=members"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 302)
+
+        circulation_page = self.client.get("/circulation")
+        self.assertEqual(circulation_page.status_code, 200)
+        self.assertNotIn(other["email"].encode(), circulation_page.data)
+
+        self.client.post("/circulation/issue", data={
+            "book_id": student_book["id"],
+            "user_id": other["id"],
+            "loan_days": 14
+        })
+        student_loan = next(
+            row for row in get_active_loans(user_id=student["id"])
+            if row["book_id"] == student_book["id"]
+        )
+
+        other_loan = issue_book(other_book["id"], other["id"], "admin")
+        self.client.post(f"/circulation/{other_loan['record_id']}/return")
+        self.assertTrue(any(
+            row["id"] == other_loan["record_id"]
+            for row in get_active_loans(user_id=other["id"])
+        ))
+        with self.assertRaises(ValidationError):
+            return_book(other_loan["record_id"], "student1", borrower_user_id=student["id"])
+
+        return_book(student_loan["id"], "admin")
+        return_book(other_loan["record_id"], "admin")
 
 
 if __name__ == "__main__":

@@ -166,7 +166,7 @@ def run_benchmark():
         "target": ">= 1,000 rec/sec",
         "mean": f"{throughput:.1f} rec/s",
         "p95": f"{import_summary['duration_ms']:.1f} ms total",
-        "status": "PASS" if throughput >= 1000.0 else "PASS (Optimized)",
+        "status": "PASS" if throughput >= 1000.0 else "FAIL",
         "note": f"Ingested {import_summary['inserted']} records in {import_summary['duration_ms']} ms"
     })
 
