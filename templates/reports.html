@@ -237,7 +237,7 @@
                             <th class="py-3 px-4">Role</th>
                             <th class="py-3 px-4 text-center">Active Loans</th>
                             <th class="py-3 px-4 text-center">Lifetime Loans</th>
-                            <th class="py-3 px-4 text-right">Total Fines ($)</th>
+                            <th class="py-3 px-4 text-right">Fines Assessed ($)</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800">
@@ -257,7 +257,7 @@
                                 {{ row.current_loans }}
                             </td>
                             <td class="py-3 px-4 text-center font-mono">{{ row.total_borrowings }}</td>
-                            <td class="py-3 px-4 text-right font-mono text-slate-300">${{ "%.2f"|format(row.total_fines_paid) }}</td>
+                            <td class="py-3 px-4 text-right font-mono text-slate-300">${{ "%.2f"|format(row.total_fines_assessed) }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

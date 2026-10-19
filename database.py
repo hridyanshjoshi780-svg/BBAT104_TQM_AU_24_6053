@@ -23,7 +23,6 @@ def get_connection(db_path: str = None):
     conn = sqlite3.connect(target_db, timeout=10.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA synchronous = NORMAL")
     conn.execute("PRAGMA busy_timeout = 5000")
     return conn
@@ -51,8 +50,20 @@ def verify_password(password: str, stored_hash: str, salt: str) -> bool:
 
 def init_db(db_path: str = None):
     """Initialize SQLite database tables, apply migrations, build indexes, and seed default data if empty."""
+    production = os.environ.get("APP_ENV", "development").strip().lower() == "production"
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    if production and not admin_password:
+        raise RuntimeError("ADMIN_PASSWORD must be configured before initializing a production database.")
+    if production and (len(admin_password) < 12 or admin_password == "admin123"):
+        raise RuntimeError("Production ADMIN_PASSWORD must be at least 12 characters and not use the demo password.")
+    if admin_password is not None and len(admin_password) < 6:
+        raise RuntimeError("ADMIN_PASSWORD must be at least 6 characters long.")
+    if not production and not admin_password:
+        admin_password = "admin123"
+
     conn = get_connection(db_path)
     cursor = conn.cursor()
+    cursor.execute("PRAGMA journal_mode = WAL")
 
     # 1. Users table (Admin & Student roles)
     cursor.execute("""
@@ -124,32 +135,32 @@ def init_db(db_path: str = None):
 
     conn.commit()
 
+    cursor.execute("BEGIN IMMEDIATE")
+
     # Seed initial users if table is empty
     cursor.execute("SELECT COUNT(*) as count FROM users")
     if cursor.fetchone()['count'] == 0:
-        # Default Admin: admin / admin123
-        admin_hash, admin_salt = hash_password("admin123")
+        admin_hash, admin_salt = hash_password(admin_password)
         cursor.execute(
             """INSERT INTO users (username, password_hash, salt, role, full_name, email)
                VALUES (?, ?, ?, ?, ?, ?)""",
             ("admin", admin_hash, admin_salt, "admin", "System Administrator", "admin@library.edu")
         )
 
-        # Default Student: student1 / student123
-        student_hash, student_salt = hash_password("student123")
-        cursor.execute(
-            """INSERT INTO users (username, password_hash, salt, role, full_name, email)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            ("student1", student_hash, student_salt, "student", "Hridyansh (Student)", "student1@library.edu")
-        )
+        if not production:
+            student_hash, student_salt = hash_password("student123")
+            cursor.execute(
+                """INSERT INTO users (username, password_hash, salt, role, full_name, email)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                ("student1", student_hash, student_salt, "student", "Hridyansh (Student)", "student1@library.edu")
+            )
 
         # Log system initialization in Audit Trail
         cursor.execute(
             """INSERT INTO audit_logs (username, action, details)
                VALUES (?, ?, ?)""",
-            ("SYSTEM", "INITIALIZE", "Database initialized with default admin and student users.")
+            ("SYSTEM", "INITIALIZE", "Database initialized with configured user accounts.")
         )
-        conn.commit()
 
     # Seed initial books if table is empty
     cursor.execute("SELECT COUNT(*) as count FROM books")
@@ -187,7 +198,7 @@ def init_db(db_path: str = None):
             metrics
         )
 
-        conn.commit()
+    conn.commit()
 
     # Apply backward-compatible migrations: ensure is_active column exists
     for table in ("users", "books"):
@@ -196,6 +207,30 @@ def init_db(db_path: str = None):
             conn.commit()
         except sqlite3.OperationalError:
             pass  # Column already exists
+
+    if production:
+        cursor.execute(
+            "SELECT id, password_hash, salt FROM users WHERE username = ?",
+            ("admin",)
+        )
+        admin = cursor.fetchone()
+        if admin and verify_password("admin123", admin["password_hash"], admin["salt"]):
+            password_hash, salt = hash_password(admin_password)
+            cursor.execute(
+                "UPDATE users SET password_hash = ?, salt = ? WHERE id = ?",
+                (password_hash, salt, admin["id"])
+            )
+            cursor.execute(
+                """INSERT INTO audit_logs (username, action, details)
+                   VALUES (?, ?, ?)""",
+                ("SYSTEM", "ADMIN_PASSWORD_ROTATED", "Replaced the development default administrator credential.")
+            )
+
+        cursor.execute("SELECT id, password_hash, salt FROM users WHERE username = ?", ("student1",))
+        student = cursor.fetchone()
+        if student and verify_password("student123", student["password_hash"], student["salt"]):
+            cursor.execute("UPDATE users SET is_active = 0 WHERE id = ?", (student["id"],))
+        conn.commit()
 
     # 6. Strategic B-Tree Indexes for Q02 Performance Requirements
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn)")
@@ -206,6 +241,57 @@ def init_db(db_path: str = None):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON search_metrics(timestamp)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs(timestamp)")
     conn.commit()
+
+    cursor.execute("CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY)")
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS books_search
+            USING fts5(title, author, isbn, content='books', content_rowid='id', tokenize='trigram')
+        """)
+        cursor.execute("""
+            CREATE TRIGGER IF NOT EXISTS books_search_insert
+            AFTER INSERT ON books
+            BEGIN
+                INSERT INTO books_search(rowid, title, author, isbn)
+                VALUES (new.id, new.title, new.author, new.isbn);
+            END
+        """)
+        cursor.execute("""
+            CREATE TRIGGER IF NOT EXISTS books_search_update
+            AFTER UPDATE OF title, author, isbn ON books
+            BEGIN
+                INSERT INTO books_search(books_search, rowid, title, author, isbn)
+                VALUES ('delete', old.id, old.title, old.author, old.isbn);
+                INSERT INTO books_search(rowid, title, author, isbn)
+                VALUES (new.id, new.title, new.author, new.isbn);
+            END
+        """)
+        cursor.execute("""
+            CREATE TRIGGER IF NOT EXISTS books_search_delete
+            AFTER DELETE ON books
+            BEGIN
+                INSERT INTO books_search(books_search, rowid, title, author, isbn)
+                VALUES ('delete', old.id, old.title, old.author, old.isbn);
+            END
+        """)
+        cursor.execute(
+            "SELECT 1 FROM schema_migrations WHERE name = ?",
+            ("books_search_trigram",)
+        )
+        if cursor.fetchone() is None:
+            cursor.execute("INSERT INTO books_search(books_search) VALUES ('rebuild')")
+            cursor.execute(
+                "INSERT INTO schema_migrations(name) VALUES (?)",
+                ("books_search_trigram",)
+            )
+        conn.commit()
+    except sqlite3.OperationalError as exc:
+        conn.rollback()
+        conn.close()
+        raise RuntimeError(
+            "SQLite FTS5 trigram support is required for indexed catalog substring search."
+        ) from exc
 
     conn.close()
 
@@ -223,4 +309,3 @@ def explain_query(sql: str, params: tuple = (), db_path: str = None) -> list[dic
 if __name__ == "__main__":
     init_db()
     print("Database initialized successfully at:", get_db_path())
-

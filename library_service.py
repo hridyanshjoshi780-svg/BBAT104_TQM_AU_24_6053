@@ -26,6 +26,44 @@ from auth import (
 # 1. FAST SEARCH (Q02 Feature 1)
 # =============================================================================
 
+def _book_search_filter(
+    query: str,
+    category: str,
+    availability: str
+) -> tuple[str, list[str]]:
+    """Build consistent catalog filters, using FTS5 for substring queries of 3+ characters."""
+    clauses = ["is_active = 1"]
+    params = []
+
+    if category and category != "All":
+        clauses.append("category = ?")
+        params.append(category)
+
+    if availability == "Available":
+        clauses.append("available_copies > 0")
+    elif availability == "Issued":
+        clauses.append("available_copies < total_copies")
+
+    if query:
+        pattern = f"%{query}%"
+        if len(query) >= 3:
+            clauses.append(
+                """id IN (
+                    SELECT rowid FROM books_search WHERE title LIKE ?
+                    UNION SELECT rowid FROM books_search WHERE author LIKE ?
+                    UNION SELECT rowid FROM books_search WHERE isbn LIKE ?
+                )"""
+            )
+            params.extend([pattern, pattern, pattern])
+        else:
+            clauses.append(
+                "(LOWER(title) LIKE ? OR LOWER(author) LIKE ? OR LOWER(isbn) LIKE ?)"
+            )
+            params.extend([pattern, pattern, pattern])
+
+    return " AND ".join(clauses), params
+
+
 def search_books(
     query: str = "",
     category: str = "All",
@@ -42,52 +80,30 @@ def search_books(
     """
     start_time = time.perf_counter()
     query = (query or "").strip().lower()
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    sql = """
+    where_sql, params = _book_search_filter(query, category, availability)
+    sql = f"""
         SELECT id, title, author, isbn, category, total_copies, available_copies, added_at, is_active
         FROM books
-        WHERE is_active = 1
+        WHERE {where_sql}
+        ORDER BY title ASC LIMIT ? OFFSET ?
     """
-    params = []
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(sql, [*params, limit, offset])
+        books = [dict(row) for row in cursor.fetchall()]
+        duration_ms = round((time.perf_counter() - start_time) * 1000.0, 2)
 
-    if category and category != "All":
-        sql += " AND category = ?"
-        params.append(category)
-
-    if availability == "Available":
-        sql += " AND available_copies > 0"
-    elif availability == "Issued":
-        sql += " AND available_copies < total_copies"
-
-    if query:
-        sql += " AND (LOWER(title) LIKE ? OR LOWER(author) LIKE ? OR LOWER(isbn) LIKE ?)"
-        pattern = f"%{query}%"
-        params.extend([pattern, pattern, pattern])
-
-    sql += " ORDER BY title ASC LIMIT ? OFFSET ?"
-    params.extend([limit, offset])
-
-    cursor.execute(sql, params)
-    books = [dict(row) for row in cursor.fetchall()]
-
-    end_time = time.perf_counter()
-    duration_ms = round((end_time - start_time) * 1000.0, 2)
-
-    if record_metric:
-        try:
+        if record_metric:
             cursor.execute(
                 """INSERT INTO search_metrics (query, duration_ms, result_count)
                    VALUES (?, ?, ?)""",
                 (query or "All", duration_ms, len(books))
             )
             conn.commit()
-        except Exception:
-            pass
+    finally:
+        conn.close()
 
-    conn.close()
     return books, duration_ms
 
 
@@ -105,40 +121,34 @@ def search_books_paginated(
     page = max(1, int(page))
     per_page = max(1, min(100, int(per_page)))
     offset = (page - 1) * per_page
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    count_sql = "SELECT COUNT(*) as cnt FROM books WHERE is_active = 1"
-    params = []
-
-    if category and category != "All":
-        count_sql += " AND category = ?"
-        params.append(category)
-
-    if availability == "Available":
-        count_sql += " AND available_copies > 0"
-    elif availability == "Issued":
-        count_sql += " AND available_copies < total_copies"
-
     clean_query = (query or "").strip().lower()
-    if clean_query:
-        count_sql += " AND (LOWER(title) LIKE ? OR LOWER(author) LIKE ? OR LOWER(isbn) LIKE ?)"
-        pattern = f"%{clean_query}%"
-        params.extend([pattern, pattern, pattern])
+    where_sql, params = _book_search_filter(clean_query, category, availability)
+    start_time = time.perf_counter()
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("BEGIN")
+        cursor.execute(f"SELECT COUNT(*) AS cnt FROM books WHERE {where_sql}", params)
+        total_count = cursor.fetchone()["cnt"]
 
-    cursor.execute(count_sql, params)
-    total_count = cursor.fetchone()["cnt"]
-    conn.close()
-
-    books, duration_ms = search_books(
-        query=clean_query,
-        category=category,
-        availability=availability,
-        limit=per_page,
-        offset=offset,
-        record_metric=True
-    )
+        cursor.execute(
+            f"""SELECT id, title, author, isbn, category, total_copies, available_copies,
+                       added_at, is_active
+                FROM books
+                WHERE {where_sql}
+                ORDER BY title ASC LIMIT ? OFFSET ?""",
+            [*params, per_page, offset]
+        )
+        books = [dict(row) for row in cursor.fetchall()]
+        duration_ms = round((time.perf_counter() - start_time) * 1000.0, 2)
+        cursor.execute(
+            """INSERT INTO search_metrics (query, duration_ms, result_count)
+               VALUES (?, ?, ?)""",
+            (clean_query or "All", duration_ms, len(books))
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
     total_pages = max(1, (total_count + per_page - 1) // per_page)
     return {
@@ -153,15 +163,9 @@ def search_books_paginated(
 
 def explain_catalog_search(query: str = "", category: str = "All") -> list[dict]:
     """Inspect query execution plan using EXPLAIN QUERY PLAN."""
-    sql = "SELECT id, title, author, isbn, category FROM books WHERE is_active = 1"
-    params = []
-    if category and category != "All":
-        sql += " AND category = ?"
-        params.append(category)
-    if query:
-        sql += " AND (LOWER(title) LIKE ? OR LOWER(author) LIKE ? OR LOWER(isbn) LIKE ?)"
-        p = f"%{query.strip().lower()}%"
-        params.extend([p, p, p])
+    clean_query = (query or "").strip().lower()
+    where_sql, params = _book_search_filter(clean_query, category, "All")
+    sql = f"SELECT id, title, author, isbn, category FROM books WHERE {where_sql}"
     return explain_query(sql, tuple(params))
 
 
@@ -527,9 +531,12 @@ def issue_book(book_id: int, user_id: int, username: str, loan_days: int = 14) -
     try:
         book_id = int(book_id)
         user_id = int(user_id)
-        loan_days = int(loan_days) if loan_days else 14
+        loan_days = 14 if loan_days is None or loan_days == "" else int(loan_days)
     except (ValueError, TypeError):
         raise ValidationError("Invalid book ID, user ID, or loan duration.")
+
+    if not 1 <= loan_days <= 90:
+        raise ValidationError("Loan duration must be between 1 and 90 days.")
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -615,7 +622,7 @@ def issue_book(book_id: int, user_id: int, username: str, loan_days: int = 14) -
     }
 
 
-def return_book(record_id: int, username: str) -> dict:
+def return_book(record_id: int, username: str, borrower_user_id: int = None) -> dict:
     """
     Process book return in an atomic transaction.
     Verifies:
@@ -628,6 +635,8 @@ def return_book(record_id: int, username: str) -> dict:
 
     try:
         record_id = int(record_id)
+        if borrower_user_id is not None:
+            borrower_user_id = int(borrower_user_id)
     except (ValueError, TypeError):
         raise ValidationError("Invalid borrow record ID.")
 
@@ -642,8 +651,9 @@ def return_book(record_id: int, username: str) -> dict:
                FROM borrow_records r
                JOIN books b ON r.book_id = b.id
                JOIN users u ON r.user_id = u.id
-               WHERE r.id = ? AND r.status = 'BORROWED'""",
-            (record_id,)
+               WHERE r.id = ? AND r.status = 'BORROWED'
+                 AND (? IS NULL OR r.user_id = ?)""",
+            (record_id, borrower_user_id, borrower_user_id)
         )
         record = cursor.fetchone()
         if not record:
@@ -770,6 +780,7 @@ def get_dashboard_metrics() -> dict:
     start_time = time.perf_counter()
     conn = get_connection()
     cursor = conn.cursor()
+    cursor.execute("BEGIN")
 
     # 1. Books summary
     cursor.execute("""
@@ -934,7 +945,7 @@ def get_report_overdue_books() -> list[dict]:
             r.borrow_date,
             r.due_date,
             ROUND((JULIANDAY(CURRENT_TIMESTAMP) - JULIANDAY(r.due_date)), 1) as days_overdue,
-            ROUND(MAX(0.0, (JULIANDAY(CURRENT_TIMESTAMP) - JULIANDAY(r.due_date)) * 1.0), 2) as estimated_fine
+            MAX(0, CAST(JULIANDAY(CURRENT_TIMESTAMP) - JULIANDAY(r.due_date) AS INTEGER)) as estimated_fine
         FROM borrow_records r
         JOIN books b ON r.book_id = b.id
         JOIN users u ON r.user_id = u.id
@@ -996,7 +1007,7 @@ def get_report_member_summary() -> list[dict]:
             u.role,
             COUNT(r.id) as total_borrowings,
             COALESCE(SUM(CASE WHEN r.status = 'BORROWED' THEN 1 ELSE 0 END), 0) as current_loans,
-            COALESCE(SUM(r.fine_amount), 0.0) as total_fines_paid
+            COALESCE(SUM(r.fine_amount), 0.0) as total_fines_assessed
         FROM users u
         LEFT JOIN borrow_records r ON u.id = r.user_id
         WHERE u.is_active = 1
@@ -1029,11 +1040,17 @@ def export_report_to_csv(report_type: str, **kwargs) -> str:
     if not data:
         return "No records found matching criteria.\n"
 
-    # Use Pandas for clean vectorized CSV generation
     df = pd.DataFrame(data)
+    df = df.map(_escape_spreadsheet_formula)
     output = io.StringIO()
     df.to_csv(output, index=False)
     return output.getvalue()
+
+
+def _escape_spreadsheet_formula(value):
+    if isinstance(value, str) and value.lstrip(" \t\r\n").startswith(("=", "+", "-", "@")):
+        return "'" + value
+    return value
 
 
 # =============================================================================
@@ -1074,7 +1091,14 @@ def import_books_from_csv(csv_content: str, admin_user: str, max_rows: int = 100
     if len(csv_content) > 10 * 1024 * 1024:  # 10 MB limit
         raise ValidationError("CSV file size exceeds maximum allowable limit of 10 MB.")
 
-    f = io.StringIO(csv_content.strip())
+    try:
+        max_rows = int(max_rows)
+    except (ValueError, TypeError):
+        raise ValidationError("Maximum CSV row count must be a positive integer.")
+    if max_rows < 1:
+        raise ValidationError("Maximum CSV row count must be a positive integer.")
+
+    f = io.StringIO(csv_content.lstrip("\ufeff").strip())
     reader = csv.reader(f)
 
     try:
@@ -1082,7 +1106,7 @@ def import_books_from_csv(csv_content: str, admin_user: str, max_rows: int = 100
     except StopIteration:
         raise ValidationError("CSV file has no content.")
 
-    headers = [h.strip().lower() for h in raw_headers if h is not None]
+    headers = [h.strip().lower() for h in raw_headers]
 
     # Map column headers
     col_map = {}
@@ -1098,7 +1122,7 @@ def import_books_from_csv(csv_content: str, admin_user: str, max_rows: int = 100
         elif h in ("copies", "total_copies", "count", "quantity"):
             col_map["copies"] = idx
 
-    required_fields = ["title", "author", "isbn", "category"]
+    required_fields = ["title", "author", "isbn", "category", "copies"]
     missing = [f for f in required_fields if f not in col_map]
     if missing:
         raise ValidationError(
@@ -1106,55 +1130,63 @@ def import_books_from_csv(csv_content: str, admin_user: str, max_rows: int = 100
             f"Expected: title, author, isbn, category, copies."
         )
 
-    copies_col = col_map.get("copies", None)
+    copies_col = col_map["copies"]
 
     # Pre-fetch existing ISBNs from database for O(1) duplicate checks
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT isbn FROM books")
-    existing_isbns = set(row["isbn"].strip().upper() for row in cursor.fetchall())
-
     batch_to_insert = []
     seen_in_batch = set()
     skipped_records = []
     failed_records = []
-    row_number = 1
+    inserted_count = 0
+    processed_rows = 0
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT isbn FROM books")
+        existing_isbns = set(row["isbn"].strip().upper() for row in cursor.fetchall())
 
-    for row in reader:
-        row_number += 1
-        if row_number > max_rows:
-            break
+        for row_number, row in enumerate(reader, start=2):
+            if row_number > max_rows + 1:
+                raise ValidationError(
+                    f"CSV exceeds the maximum of {max_rows} data rows; no rows were imported."
+                )
+            processed_rows += 1
 
-        # Skip empty lines
-        if not row or not any(field.strip() for field in row):
-            continue
+            if not row or not any(field.strip() for field in row):
+                continue
 
-        try:
-            title = row[col_map["title"]].strip()
-            author = row[col_map["author"]].strip()
-            isbn = row[col_map["isbn"]].strip().upper()
-            category = row[col_map["category"]].strip()
+            try:
+                title = row[col_map["title"]].strip()
+                author = row[col_map["author"]].strip()
+                isbn = row[col_map["isbn"]].strip().upper()
+                category = row[col_map["category"]].strip()
 
-            if not title or not author or not isbn or not category:
+                if not title or not author or not isbn or not category:
+                    failed_records.append({
+                        "row": row_number,
+                        "isbn": isbn or "N/A",
+                        "reason": "Missing required field (Title, Author, ISBN, or Category)."
+                    })
+                    continue
+
+                copies = int(row[copies_col].strip())
+                if copies <= 0:
+                    raise ValueError
+            except IndexError:
                 failed_records.append({
                     "row": row_number,
-                    "isbn": isbn or "N/A",
-                    "reason": "Missing required field (Title, Author, ISBN, or Category)."
+                    "isbn": "N/A",
+                    "reason": "Malformed row: insufficient columns."
+                })
+                continue
+            except ValueError:
+                failed_records.append({
+                    "row": row_number,
+                    "isbn": isbn,
+                    "reason": "Copies must be a positive integer."
                 })
                 continue
 
-            copies = 1
-            if copies_col is not None and copies_col < len(row):
-                copies_str = row[copies_col].strip()
-                if copies_str:
-                    try:
-                        copies = int(copies_str)
-                        if copies <= 0:
-                            copies = 1
-                    except ValueError:
-                        copies = 1
-
-            # Duplicate check
             if isbn in existing_isbns or isbn in seen_in_batch:
                 skipped_records.append({
                     "row": row_number,
@@ -1167,37 +1199,28 @@ def import_books_from_csv(csv_content: str, admin_user: str, max_rows: int = 100
             seen_in_batch.add(isbn)
             batch_to_insert.append((title, author, isbn, category, copies, copies, 1))
 
-        except IndexError:
-            failed_records.append({
-                "row": row_number,
-                "isbn": "N/A",
-                "reason": "Malformed row: insufficient columns."
-            })
-        except Exception as e:
-            failed_records.append({
-                "row": row_number,
-                "isbn": "N/A",
-                "reason": f"Parsing error: {str(e)}"
-            })
-
-    # High-speed batch insertion inside single atomic commit
-    inserted_count = 0
-    if batch_to_insert:
-        try:
-            cursor.execute("BEGIN IMMEDIATE")
-            cursor.executemany(
-                """INSERT INTO books (title, author, isbn, category, total_copies, available_copies, is_active)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                batch_to_insert
-            )
-            inserted_count = len(batch_to_insert)
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            conn.close()
-            raise ValidationError(f"Database batch insertion failed: {str(e)}")
-
-    conn.close()
+        if batch_to_insert:
+            try:
+                cursor.execute("BEGIN IMMEDIATE")
+                cursor.executemany(
+                    """INSERT INTO books (title, author, isbn, category, total_copies, available_copies, is_active)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    batch_to_insert
+                )
+                conn.commit()
+                inserted_count = len(batch_to_insert)
+            except sqlite3.IntegrityError as exc:
+                conn.rollback()
+                raise ValidationError(
+                    "CSV batch conflicts with existing catalog data; no rows were imported."
+                ) from exc
+            except sqlite3.Error:
+                conn.rollback()
+                raise
+    except csv.Error as exc:
+        raise ValidationError("CSV file is malformed.") from exc
+    finally:
+        conn.close()
 
     end_time = time.perf_counter()
     duration_s = max(0.0001, end_time - start_time)
@@ -1211,7 +1234,7 @@ def import_books_from_csv(csv_content: str, admin_user: str, max_rows: int = 100
     )
 
     return {
-        "total_processed": row_number - 1,
+        "total_processed": processed_rows,
         "inserted": inserted_count,
         "skipped_count": len(skipped_records),
         "failed_count": len(failed_records),
