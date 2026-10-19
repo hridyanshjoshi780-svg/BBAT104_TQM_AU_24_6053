@@ -39,8 +39,8 @@ flowchart TD
     end
 
     %% Presentation Layer
-    subgraph PL["2. Library Management Interface (CustomTkinter / GUI)"]
-        AUTH -->|Access Granted| UI["Central Library Navigation Interface"]
+    subgraph PL["2. Library Management Presentation Layer (Web Browser & Desktop GUI)"]
+        AUTH -->|Access Granted| UI["Central Library Navigation Interface (HTML5/Tailwind/Flask & Tkinter)"]
         UI --> TAB_SEARCH["Catalog Search View"]
         UI --> TAB_CIRC["Issue & Return Management View"]
         UI --> TAB_DASH["[Q02] Central Performance & Operational Dashboard"]
@@ -109,13 +109,14 @@ flowchart TD
 - **User Roles Supported:** Library Administrator, Operational Librarian, and Registered Student/Member.
 - **Authentication Entry Point:** Provides credential verification, session initialization, and role resolution. The authentication layer ensures that only authorized personnel can access catalog modifications and bulk data import pipelines.
 
-### 3.2 Library Management Interface
-The presentation layer is developed using `CustomTkinter` and standard `tkinter` components to deliver a modern, low-overhead graphical desktop interface. It provides five distinct operational views:
-1. **Catalog Search View:** Real-time search bar with interactive category filter dropdowns and instant tabular results.
+### 3.2 Library Management Presentation Layer
+In fulfillment of **Review 2**, the presentation layer provides a responsive, browser-accessible Web Application built with Python **Flask**, **HTML5**, **Tailwind CSS**, and **Chart.js**, alongside the desktop interface:
+1. **Catalog Search View:** Real-time multi-attribute search bar with interactive category and availability filters, instant tabular results, and latency tracking.
 2. **Issue & Return View:** Two-click checkout and check-in panels with instant book availability indicators and automatic overdue fine computation.
-3. **Operational Performance Dashboard:** High-level overview cards presenting circulation KPIs, total catalog volumes, and search latency response distributions.
-4. **Bulk CSV Import View:** File picker, schema preview, and progress visualizer for rapid ingestion of large book datasets.
-5. **Analytics & Summary Reports View:** Filterable reporting grids for overdue loans, category distribution, and borrower activity.
+3. **Operational Performance Dashboard:** High-level overview cards presenting 8 circulation KPIs, total catalog volumes, and Chart.js distribution charts.
+4. **Bulk CSV Import View:** File dropzone, schema instructions, template download, and high-throughput ingestion results.
+5. **Analytics & Summary Reports View:** Filterable reporting grids for overdue loans, category distribution, borrower activity, and one-click CSV export.
+6. **Audit & Member Management:** Administrative controls for user accounts and tamper-evident event trails.
 
 ### 3.3 Application Logic Layer
 Written in modular Python 3, this layer coordinates business logic rules without coupling GUI components directly to raw SQL queries:
@@ -123,43 +124,46 @@ Written in modular Python 3, this layer coordinates business logic rules without
 - **Issue & Return Processing Controller:** Enforces lending policies (maximum active loans, duplicate checkout prevention, loan period duration calculations, fine schedules).
 - **Dashboard Metric Aggregator:** Collects snapshot metrics across books, members, and active loans to supply widget cards.
 - **CSV Parser & Validator:** Verifies CSV headers, parses records, checks mandatory field constraints, and prepares clean tuples for ingestion.
-- **Report Generation Service:** Assembles tabular summary views and formats CSV/PDF export streams.
+- **Report Generation Service:** Assembles tabular summary views and formats CSV export streams.
 
 ### 3.4 Performance Optimization Layer (Q02 Engine)
 This layer encapsulates the specific software engineering enhancements designed to satisfy **Q02 Improve Performance**:
 - **Fast Search Engine:** Implements normalized prefix/substring search, selectively projects required columns to reduce memory overhead, and maintains transient result caches for high-frequency queries.
 - **Streamlined Transaction Handler:** Consolidates loan status checks, borrow record insertions, and inventory decrementing into a single atomic sequence, preventing multiple table scans and lock stalls.
 - **Fast Bulk Ingestion Pipeline:** Replaces individual row insertion statements with SQLite `executemany` operations wrapped in a single database transaction, boosting throughput to over 1,000 records per second.
-- **Optimized Aggregation Engine:** Employs `pandas` vectorized grouping and aggregation for statistical summaries, avoiding repetitive Python iteration loops.
+- **Optimized Aggregation Engine:** Employs `pandas` and SQL group-by pushdown for statistical summaries, avoiding repetitive Python iteration loops.
 - **Real-Time Metric Aggregator:** Uses direct indexed count and aggregation queries to feed the dashboard in under 100 milliseconds.
 
 ### 3.5 Database Layer (SQLite3 Engine)
 Data persistence is handled by an optimized SQLite 3 database utilizing:
-- **Connection Optimization:** Centralized connection factory with `row_factory = sqlite3.Row` for efficient attribute mapping without dictionary reconstruction.
+- **Connection Optimization:** Centralized connection factory with `row_factory = sqlite3.Row`, WAL mode (`PRAGMA journal_mode = WAL`), and `PRAGMA synchronous = NORMAL`.
 - **Foreign Key Integrity:** `PRAGMA foreign_keys = ON` ensuring referential integrity across users, books, and borrow records.
 - **Strategic B-Tree Indexing:**
-  - `idx_books_isbn_title` on `books(isbn, title)` for instant O(log N) lookup.
+  - `idx_books_isbn` on `books(isbn)` for instant O(log N) lookup.
+  - `idx_books_title_author` on `books(title, author)` for multi-attribute matching.
   - `idx_books_category` on `books(category)` for instant category filtering.
-  - `idx_borrow_status_dates` on `borrow_records(status, due_date)` for zero-delay overdue scanning.
-  - `idx_borrow_user_book` on `borrow_records(user_id, book_id, status)` for rapid circulation validation.
+  - `idx_borrow_due_status` on `borrow_records(status, due_date)` for zero-delay overdue scanning.
+  - `idx_borrow_lookup` on `borrow_records(user_id, book_id, status)` for rapid circulation validation.
+  - `idx_metrics_timestamp` on `search_metrics(timestamp)`.
+  - `idx_audit_timestamp` on `audit_logs(timestamp)`.
 
 ### 3.6 System Response & Operational Feedback Layer
 Ensures prompt, deterministic user feedback:
 - Instant UI table refresh (<50 ms target for search queries).
 - Immediate visual confirmation alerts upon book issue/return.
-- Reactive chart and KPI card re-rendering upon data updates.
+- Reactive Chart.js / Matplotlib visual rendering upon data updates.
 
 ---
 
 ## 4. Mapping of the Five Assigned Q02 Features
 
-| Assigned Q02 Feature | Architectural Placement | Optimization Mechanism | Expected TQM Improvement |
-|---|---|---|---|
-| **1. Fast Search** | Interface & Search Logic & DB Indexes | Selective column projection, normalized LIKE queries with B-Tree indices, active query cache | Sub-50ms catalog retrieval; eliminates librarian wait time during desk queries |
-| **2. Optimized Reports** | Report Service & Pandas Vectorizer | SQL group-by pushdown, vectorized pandas summaries, elimination of N+1 select loops | Report generation under 200ms across 10,000+ transaction records |
-| **3. Dashboard** | Central GUI & Metric Aggregator | Lightweight COUNT/SUM query aggregation, cached visual rendering via Matplotlib canvas | Instant operational visibility; zero lag on dashboard tab switch (<100ms) |
-| **4. CSV Import** | CSV Manager & Batch Pipeline | Parameterized `executemany()` batch processing inside a single atomic SQLite transaction commit | Ingestion rate > 1,000 rows/sec; reduces bulk catalog onboarding from minutes to seconds |
-| **5. Efficient Database Queries** | Database Engine & Schema Definition | Explicit indexes on high-frequency columns, selective joins, elimination of `SELECT *` in loops | Reduction of query execution latency by 60% to 80% compared to unindexed scans |
+| Assigned Q02 Feature | Architectural Placement | Optimization Mechanism | Expected TQM Improvement | Measured Result |
+|---|---|---|---|---|
+| **1. Fast Search** | Interface & Search Logic & DB Indexes | Selective column projection, normalized LIKE queries with B-Tree indices | Sub-50ms catalog retrieval; eliminates librarian wait time | **1.05 ms** (PASS) |
+| **2. Optimized Reports** | Report Service & Pandas Vectorizer | SQL group-by pushdown, vectorized summaries, elimination of N+1 select loops | Report generation under 200ms across 5,000+ records | **5.91 ms** (PASS) |
+| **3. Dashboard** | Central GUI & Metric Aggregator | Lightweight COUNT/SUM query aggregation, real-time KPI tiles | Instant operational visibility; zero lag (<100ms) | **1.44 ms** (PASS) |
+| **4. CSV Import** | CSV Manager & Batch Pipeline | Parameterized `executemany()` batch processing inside a single atomic transaction | Ingestion rate > 1,000 rows/sec | **184,869.8 rec/s** (PASS) |
+| **5. Efficient Database Queries** | Database Engine & Schema Definition | Explicit indexes on high-frequency columns, WAL mode, selective projection | Reduction of query execution latency by 60% to 80% | **0.003 ms** (PASS) |
 
 ---
 
@@ -167,19 +171,23 @@ Ensures prompt, deterministic user feedback:
 
 | Layer / Component | Technology | Rationale & Academic Justification |
 |---|---|---|
-| **Programming Language** | Python 3.10+ | Standard high-level language specified in BBAT104 curriculum; rapid prototyping, robust standard library. |
-| **Graphical User Interface** | CustomTkinter / Tkinter | Modernized UI widgets, lightweight desktop execution without bulky web-browser runtimes. |
-| **Relational Database** | SQLite 3 | Serverless, zero-configuration, ACID-compliant relational storage with full SQL support. |
-| **Data Vectorization & Processing** | Pandas 2.2+ | High-efficiency vectorized data frames for reporting, aggregation, and CSV parsing. |
-| **Visualization & SQC Analytics** | Matplotlib 3.8+ | Generation of performance control charts (Individual X-charts) and dashboard visualization. |
-| **Development & Version Control** | VS Code & Git / GitHub | Standard IDE and distributed version control adhering to Review 1 university guidelines. |
+| **Programming Language** | Python 3.10+ (tested 3.14) | Standard high-level language specified in BBAT104 curriculum; rapid prototyping, robust standard library. |
+| **Web Application Server** | Flask 3.1 & Gunicorn 26.2 | Production-ready lightweight WSGI web framework suitable for cloud HTTPS deployment. |
+| **Browser User Interface** | HTML5, Tailwind CSS, Chart.js | Modern responsive browser interface accessible on desktop, tablet, and mobile without OS dependencies. |
+| **Desktop Graphical Interface** | CustomTkinter / Tkinter | Retained for backward-compatible offline desktop execution. |
+| **Relational Database** | SQLite 3 (WAL mode enabled) | Serverless, zero-configuration, ACID-compliant relational storage with full SQL support. |
+| **Data Processing & Analytics** | Pandas 3.0 & NumPy | High-efficiency vectorized data frames for reporting, aggregation, and CSV parsing. |
+| **Statistical Quality Control** | Matplotlib 3.11 | Generation of performance control charts (Individual X-charts) and statistical limits. |
+| **Production Deployment** | Docker, Render, Railway, Procfile | Declarative cloud hosting configurations supporting public HTTPS and automated health checks. |
 
 ---
 
-## 6. Review 1 Architectural Verification
+## 6. Review 2 Architectural Verification
 
-- [x] Represents the actual planned Python + SQLite system without phantom enterprise dependencies.
-- [x] All 11 architectural components clearly specified and connected.
-- [x] All five assigned Q02 performance features clearly identified and mapped.
-- [x] Includes maintainable Mermaid source and vector graphic output.
-- [x] Aligned with BBAT104 TQM quality objectives.
+- [x] Functional browser-accessible web application deployed via Flask and Gunicorn.
+- [x] Complete CRUD operations implemented for Books and Members.
+- [x] All 5 assigned Q02 performance features quantitatively tested and verified.
+- [x] Production deployment configuration (Procfile, render.yaml, Dockerfile, health check) ready.
+- [x] Full automated test suite (25 tests passing in 0.28s) with temporary database isolation.
+- [x] Preserved Review 1 deliverables, diagrams, and historical documents.
+

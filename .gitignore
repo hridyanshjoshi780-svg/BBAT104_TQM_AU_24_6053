@@ -4,4 +4,10 @@ __pycache__/
 *.pyo
 *.pyd
 *.db
+*.db-wal
+*.db-shm
+*.bak
+*.log
+.env
 .DS_Store
+instance/

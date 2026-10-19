@@ -6,8 +6,8 @@
 **Roll Number:** 31  
 **Assigned Quality Goal:** Q02 Improve Performance  
 **Core TQM Goal:** Optimize issue and return flow and catalog search speed  
-**Project Milestone:** Review 1  
-**Document Version:** 1.0  
+**Project Milestone:** Review 2  
+**Document Version:** 2.0  
 
 ---
 
@@ -36,11 +36,11 @@ The project is structured around specific technical and quality objectives align
 ## 3. Project Boundaries
 
 The boundaries of the project define the execution context:
-- **Application Type:** Standalone desktop application.
-- **Operating Environment:** Local workstation (cross-platform: Linux, Windows, macOS).
-- **Execution Domain:** Single-library circulation counter and administrative desk.
-- **Data Persistence:** Local, embedded SQLite relational database (`library.db`).
-- **User Interface:** Modern desktop GUI developed using CustomTkinter / Tkinter.
+- **Application Type:** Responsive Web Application (with backward-compatible Desktop GUI).
+- **Operating Environment:** Browser-accessible (local or public HTTPS cloud hosting) and cross-platform workstation.
+- **Execution Domain:** Institutional library circulation counter, student patron access, and administrative desk.
+- **Data Persistence:** Persistent SQLite relational database with WAL mode (`library.db`).
+- **User Interface:** Modern web browser interface (HTML5 / Tailwind CSS / Chart.js) and CustomTkinter desktop interface.
 
 ---
 

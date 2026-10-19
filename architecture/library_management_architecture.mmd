@@ -7,8 +7,8 @@ flowchart TD
     end
 
     %% Presentation Layer
-    subgraph PL["2. Library Management Interface (CustomTkinter / GUI)"]
-        AUTH -->|Access Granted| UI["Central Library Navigation Interface"]
+    subgraph PL["2. Library Management Presentation Layer (Web Browser & Desktop GUI)"]
+        AUTH -->|Access Granted| UI["Central Library Navigation Interface (HTML5/Tailwind/Flask & Tkinter)"]
         UI --> TAB_SEARCH["Catalog Search View"]
         UI --> TAB_CIRC["Issue & Return Management View"]
         UI --> TAB_DASH["[Q02] Central Performance & Operational Dashboard"]

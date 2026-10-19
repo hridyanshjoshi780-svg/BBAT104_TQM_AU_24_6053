@@ -12,12 +12,22 @@ from datetime import datetime, timedelta
 DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "library.db")
 
 
-def get_connection():
-    """Create and return a database connection with row factory enabled."""
-    conn = sqlite3.connect(DB_FILE)
+def get_db_path() -> str:
+    """Return active SQLite database file path from environment or default."""
+    return os.environ.get("DATABASE_PATH", DB_FILE)
+
+
+def get_connection(db_path: str = None):
+    """Create and return an optimized database connection with row factory enabled."""
+    target_db = db_path or get_db_path()
+    conn = sqlite3.connect(target_db, timeout=10.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
+    conn.execute("PRAGMA busy_timeout = 5000")
     return conn
+
 
 
 def hash_password(password: str, salt: str = None) -> tuple[str, str]:
@@ -39,9 +49,9 @@ def verify_password(password: str, stored_hash: str, salt: str) -> bool:
     return secrets.compare_digest(computed_hash, stored_hash)
 
 
-def init_db():
-    """Initialize SQLite database tables and seed default data if empty."""
-    conn = get_connection()
+def init_db(db_path: str = None):
+    """Initialize SQLite database tables, apply migrations, build indexes, and seed default data if empty."""
+    conn = get_connection(db_path)
     cursor = conn.cursor()
 
     # 1. Users table (Admin & Student roles)
@@ -179,9 +189,38 @@ def init_db():
 
         conn.commit()
 
+    # Apply backward-compatible migrations: ensure is_active column exists
+    for table in ("users", "books"):
+        try:
+            cursor.execute(f"ALTER TABLE {table} ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+    # 6. Strategic B-Tree Indexes for Q02 Performance Requirements
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_books_title_author ON books(title, author)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_books_category ON books(category)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_borrow_lookup ON borrow_records(user_id, book_id, status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_borrow_due_status ON borrow_records(status, due_date)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON search_metrics(timestamp)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs(timestamp)")
+    conn.commit()
+
     conn.close()
+
+
+def explain_query(sql: str, params: tuple = (), db_path: str = None) -> list[dict]:
+    """Execute EXPLAIN QUERY PLAN on the given SQL query and return plan steps."""
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute(f"EXPLAIN QUERY PLAN {sql}", params)
+    plan = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return plan
 
 
 if __name__ == "__main__":
     init_db()
-    print("Database initialized successfully at:", DB_FILE)
+    print("Database initialized successfully at:", get_db_path())
+

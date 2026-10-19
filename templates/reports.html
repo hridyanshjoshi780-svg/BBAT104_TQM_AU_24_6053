@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block title %}Optimized Reports — BBAT104 Library Management System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header Section -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800">
+        <div>
+            <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                <span>Optimized Management Reports</span>
+                <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                    Q02 Vectorized Reports
+                </span>
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">
+                SQL group-by aggregations and Pandas vectorized summaries eliminating N+1 iteration delays.
+            </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <span class="text-xs font-mono px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-sky-400">
+                ⚡ Latency: <strong class="text-white">{{ duration_ms }} ms</strong> (Target: &le; 200 ms)
+            </span>
+            <a href="{{ url_for('export_report_csv_route') }}?type={{ report_type }}&category={{ category }}&start_date={{ start_date }}&end_date={{ end_date }}"
+               class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition flex items-center gap-1.5 shadow-md shadow-emerald-600/30">
+                <span>📥</span> Export to CSV
+            </a>
+        </div>
+    </div>
+
+    <!-- Report Tabs -->
+    <div class="flex flex-wrap gap-2 border-b border-slate-800 pb-3 text-xs">
+        <a href="{{ url_for('reports', type='inventory') }}"
+           class="px-3.5 py-2 rounded-lg font-medium transition {% if report_type == 'inventory' %}bg-sky-600 text-white{% else %}bg-slate-800 text-slate-300 hover:bg-slate-700{% endif %}">
+            📦 Category Inventory Summary
+        </a>
+        <a href="{{ url_for('reports', type='issued') }}"
+           class="px-3.5 py-2 rounded-lg font-medium transition {% if report_type == 'issued' %}bg-sky-600 text-white{% else %}bg-slate-800 text-slate-300 hover:bg-slate-700{% endif %}">
+            🔄 Currently Issued Books
+        </a>
+        <a href="{{ url_for('reports', type='overdue') }}"
+           class="px-3.5 py-2 rounded-lg font-medium transition {% if report_type == 'overdue' %}bg-sky-600 text-white{% else %}bg-slate-800 text-slate-300 hover:bg-slate-700{% endif %}">
+            ⚠️ Overdue Books Audit
+        </a>
+        <a href="{{ url_for('reports', type='circulation') }}"
+           class="px-3.5 py-2 rounded-lg font-medium transition {% if report_type == 'circulation' %}bg-sky-600 text-white{% else %}bg-slate-800 text-slate-300 hover:bg-slate-700{% endif %}">
+            📜 Circulation Activity Log
+        </a>
+        <a href="{{ url_for('reports', type='members') }}"
+           class="px-3.5 py-2 rounded-lg font-medium transition {% if report_type == 'members' %}bg-sky-600 text-white{% else %}bg-slate-800 text-slate-300 hover:bg-slate-700{% endif %}">
+            👥 Member Borrowing Summaries
+        </a>
+    </div>
+
+    <!-- Filter Bar (when applicable) -->
+    {% if report_type == 'circulation' %}
+    <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl p-4 text-xs">
+        <form method="GET" action="{{ url_for('reports') }}" class="flex flex-wrap items-end gap-3">
+            <input type="hidden" name="type" value="circulation">
+            <div>
+                <label class="block text-slate-400 font-semibold mb-1">Start Date</label>
+                <input type="date" name="start_date" value="{{ start_date }}"
+                       class="px-3 py-1.5 rounded bg-slate-900 border border-slate-700 text-white">
+            </div>
+            <div>
+                <label class="block text-slate-400 font-semibold mb-1">End Date</label>
+                <input type="date" name="end_date" value="{{ end_date }}"
+                       class="px-3 py-1.5 rounded bg-slate-900 border border-slate-700 text-white">
+            </div>
+            <button type="submit" class="px-4 py-1.5 rounded bg-sky-600 hover:bg-sky-500 text-white font-medium">Filter</button>
+            <a href="{{ url_for('reports', type='circulation') }}" class="px-3 py-1.5 rounded bg-slate-800 text-slate-300">Reset</a>
+        </form>
+    </div>
+    {% elif report_type == 'issued' %}
+    <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl p-4 text-xs">
+        <form method="GET" action="{{ url_for('reports') }}" class="flex items-center gap-3">
+            <input type="hidden" name="type" value="issued">
+            <label class="text-slate-400 font-semibold">Filter by Category:</label>
+            <select name="category" onchange="this.form.submit()" class="px-3 py-1.5 rounded bg-slate-900 border border-slate-700 text-white">
+                <option value="All" {% if category == 'All' %}selected{% endif %}>All Categories</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Report Table Container -->
+    <div class="bg-[#1e293b] border border-slate-700/80 rounded-xl overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            {% if report_type == 'inventory' %}
+                <!-- 1. Inventory Summary -->
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-900/80 uppercase tracking-wider text-[11px] font-semibold text-slate-400 border-b border-slate-700">
+                        <tr>
+                            <th class="py-3 px-4">Subject Category</th>
+                            <th class="py-3 px-4 text-center">Unique Titles</th>
+                            <th class="py-3 px-4 text-center">Total Copies</th>
+                            <th class="py-3 px-4 text-center">Available</th>
+                            <th class="py-3 px-4 text-center">Borrowed</th>
+                            <th class="py-3 px-4 text-right">Utilization Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800">
+                        {% for row in data %}
+                        <tr class="table-row-hover transition">
+                            <td class="py-3 px-4 font-semibold text-white">{{ row.category }}</td>
+                            <td class="py-3 px-4 text-center font-mono">{{ row.unique_titles }}</td>
+                            <td class="py-3 px-4 text-center font-mono">{{ row.total_copies }}</td>
+                            <td class="py-3 px-4 text-center font-mono text-emerald-400">{{ row.available_copies }}</td>
+                            <td class="py-3 px-4 text-center font-mono text-sky-400">{{ row.borrowed_copies }}</td>
+                            <td class="py-3 px-4 text-right font-bold text-amber-400">{{ row.utilization_pct }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+            {% elif report_type == 'issued' %}
+                <!-- 2. Currently Issued -->
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-900/80 uppercase tracking-wider text-[11px] font-semibold text-slate-400 border-b border-slate-700">
+                        <tr>
+                            <th class="py-3 px-4">Loan ID</th>
+                            <th class="py-3 px-4">Book Title & Author</th>
+                            <th class="py-3 px-4">ISBN</th>
+                            <th class="py-3 px-4">Borrower</th>
+                            <th class="py-3 px-4">Borrow Date</th>
+                            <th class="py-3 px-4">Due Date</th>
+                            <th class="py-3 px-4 text-right">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800">
+                        {% if data %}
+                            {% for row in data %}
+                            <tr class="table-row-hover transition">
+                                <td class="py-3 px-4 font-mono text-slate-400">#{{ row.record_id }}</td>
+                                <td class="py-3 px-4">
+                                    <div class="font-semibold text-white">{{ row.title }}</div>
+                                    <div class="text-[11px] text-slate-400">by {{ row.author }}</div>
+                                </td>
+                                <td class="py-3 px-4 font-mono">{{ row.isbn }}</td>
+                                <td class="py-3 px-4 text-white">{{ row.borrower_name }} (@{{ row.borrower_username }})</td>
+                                <td class="py-3 px-4 text-slate-400">{{ row.borrow_date }}</td>
+                                <td class="py-3 px-4 text-slate-200">{{ row.due_date }}</td>
+                                <td class="py-3 px-4 text-right">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold {% if row.status == 'OVERDUE' %}bg-rose-500/20 text-rose-300 border border-rose-500/30{% else %}bg-sky-500/20 text-sky-300 border border-sky-500/30{% endif %}">
+                                        {{ row.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="7" class="py-8 text-center text-slate-400">No books currently issued.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+
+            {% elif report_type == 'overdue' %}
+                <!-- 3. Overdue Books -->
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-900/80 uppercase tracking-wider text-[11px] font-semibold text-slate-400 border-b border-slate-700">
+                        <tr>
+                            <th class="py-3 px-4">Borrower</th>
+                            <th class="py-3 px-4">Book Title</th>
+                            <th class="py-3 px-4">Due Date</th>
+                            <th class="py-3 px-4 text-center">Days Overdue</th>
+                            <th class="py-3 px-4 text-right">Estimated Fine ($)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800">
+                        {% if data %}
+                            {% for row in data %}
+                            <tr class="table-row-hover transition">
+                                <td class="py-3 px-4">
+                                    <div class="font-semibold text-white">{{ row.borrower_name }}</div>
+                                    <div class="text-[11px] text-slate-400">{{ row.email }}</div>
+                                </td>
+                                <td class="py-3 px-4 font-medium text-white">{{ row.title }}</td>
+                                <td class="py-3 px-4 font-mono text-rose-300">{{ row.due_date }}</td>
+                                <td class="py-3 px-4 text-center font-bold text-rose-400">{{ row.days_overdue }} days</td>
+                                <td class="py-3 px-4 text-right font-mono font-bold text-amber-400">${{ "%.2f"|format(row.estimated_fine) }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="5" class="py-8 text-center text-emerald-400">🎉 Excellent! No books are currently overdue.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+
+            {% elif report_type == 'circulation' %}
+                <!-- 4. Circulation Activity -->
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-900/80 uppercase tracking-wider text-[11px] font-semibold text-slate-400 border-b border-slate-700">
+                        <tr>
+                            <th class="py-3 px-4">Tx ID</th>
+                            <th class="py-3 px-4">Book Title</th>
+                            <th class="py-3 px-4">Borrower</th>
+                            <th class="py-3 px-4">Issue Date</th>
+                            <th class="py-3 px-4">Return Date</th>
+                            <th class="py-3 px-4">Status</th>
+                            <th class="py-3 px-4 text-right">Fine ($)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800">
+                        {% if data %}
+                            {% for row in data %}
+                            <tr class="table-row-hover transition">
+                                <td class="py-3 px-4 font-mono text-slate-400">#{{ row.record_id }}</td>
+                                <td class="py-3 px-4 font-medium text-white">{{ row.title }}</td>
+                                <td class="py-3 px-4 text-slate-300">{{ row.full_name }}</td>
+                                <td class="py-3 px-4 text-slate-400">{{ row.borrow_date }}</td>
+                                <td class="py-3 px-4 text-slate-400">{{ row.return_date or 'Active' }}</td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-medium {% if row.status == 'RETURNED' %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30{% else %}bg-sky-500/20 text-sky-300 border border-sky-500/30{% endif %}">
+                                        {{ row.status }}
+                                    </span>
+                                </td>
+                                <td class="py-3 px-4 text-right font-mono text-slate-300">${{ "%.2f"|format(row.fine_amount) }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="7" class="py-8 text-center text-slate-400">No circulation activity found for this period.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+
+            {% elif report_type == 'members' %}
+                <!-- 5. Member Summaries -->
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-900/80 uppercase tracking-wider text-[11px] font-semibold text-slate-400 border-b border-slate-700">
+                        <tr>
+                            <th class="py-3 px-4">Member Name</th>
+                            <th class="py-3 px-4">Email</th>
+                            <th class="py-3 px-4">Role</th>
+                            <th class="py-3 px-4 text-center">Active Loans</th>
+                            <th class="py-3 px-4 text-center">Lifetime Loans</th>
+                            <th class="py-3 px-4 text-right">Total Fines ($)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800">
+                        {% for row in data %}
+                        <tr class="table-row-hover transition">
+                            <td class="py-3 px-4">
+                                <div class="font-semibold text-white">{{ row.full_name }}</div>
+                                <div class="text-[11px] text-slate-400">@{{ row.username }}</div>
+                            </td>
+                            <td class="py-3 px-4 font-mono text-slate-300">{{ row.email }}</td>
+                            <td class="py-3 px-4">
+                                <span class="px-2 py-0.5 rounded text-[10px] uppercase font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                                    {{ row.role }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-center font-bold {% if row.current_loans > 0 %}text-amber-400{% else %}text-slate-500{% endif %}">
+                                {{ row.current_loans }}
+                            </td>
+                            <td class="py-3 px-4 text-center font-mono">{{ row.total_borrowings }}</td>
+                            <td class="py-3 px-4 text-right font-mono text-slate-300">${{ "%.2f"|format(row.total_fines_paid) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}
