@@ -14,8 +14,8 @@
 | **Baseline Software System** | Library Management System |
 | **Assigned Quality Goal** | Q02 Improve Performance |
 | **Core TQM Objective** | Optimize issue and return flow and catalog search speed |
-| **Deliverable Milestone** | Review 1: Project Setup, Architecture, Scope & SRS |
-| **Document Version** | 1.0 (Review 1 Submission) |
+| **Deliverable Milestone** | Review 2: Implementation, Testing & Deployment Preparation |
+| **Document Version** | 2.0 |
 | **Date** | Academic Session 2026–2027 |
 
 ---
@@ -25,10 +25,10 @@
 ### 2.1 Purpose
 The purpose of this Software Requirements Specification (SRS) document is to specify the functional, non-functional, architectural, and quality management requirements for the **Library Management System**. Developed as an academic course project for **BBAT104 Fundamentals of Total Quality Management**, this system provides core circulation and inventory services while serving as the baseline for systematic quality engineering. The primary engineering emphasis of this project is directed toward **Q02 Improve Performance**, specifically targeting the optimization of issue and return workflows and catalog search speeds through sound architectural practices, database index optimization, vectorized reporting, and bulk data handling.
 
-This specification serves as the formal baseline agreement for system evaluation during **Review 1**, governing subsequent design, implementation, verification, and Statistical Quality Control (SQC) activities.
+This specification preserves the Review 1 requirements and records the verified Review 2 implementation and performance measurements.
 
 ### 2.2 Project Scope
-The Library Management System is a lightweight, responsive desktop application developed in Python 3 utilizing an SQLite relational database engine, a CustomTkinter graphical interface, and Pandas/Matplotlib analytical libraries. The scope encompasses:
+The Library Management System is a Python application with a responsive Flask browser interface, a backward-compatible CustomTkinter desktop interface, and an SQLite database. Pandas supports report processing, while Matplotlib is used for desktop statistical quality-control charts. The scope encompasses:
 - Core book catalog registration and tracking.
 - Member (student/patron) record management.
 - Rapid issue and return circulation transactions with automated fine determination.
@@ -46,7 +46,7 @@ The intended primary users of the system include:
 4. **Academic Course Evaluator / Teacher:** University faculty evaluating system compliance with BBAT104 curriculum requirements, architectural soundness, and quantitative performance improvement metrics under Q02.
 
 ### 2.4 Product Overview
-The Library Management System transitions traditional manual or slow file-based library records into an indexed, automated desktop solution. While basic systems frequently suffer from unindexed database scans, latency bottlenecks during catalog lookups, and cumbersome single-record entries, this system incorporates a dedicated **Performance Optimization Layer**. By introducing structured indexing, bulk parameterized transaction pipelines, vectorized aggregations, and lightweight dashboard summaries, the product delivers high operational responsiveness even as catalog and transaction volumes scale.
+The Library Management System transitions traditional manual or slow file-based library records into an indexed, automated application with a browser interface and a local desktop interface. Its performance features include indexed catalog search, bulk parameterized transactions, SQL aggregations, and lightweight dashboard summaries.
 
 ---
 
@@ -68,8 +68,8 @@ To address these challenges under the **BBAT104 TQM** framework, this project es
 The project is driven by seven core technical and quality objectives:
 1. **Efficient Catalog Search:** Implement a fast, multi-attribute catalog search mechanism (title, author, ISBN, category) achieving query execution latencies under 50 milliseconds for typical catalog sizes.
 2. **Efficient Issue and Return Processing:** Streamline book checkout and return flows into single-step, atomic database operations with automatic stock updates and overdue fine calculations.
-3. **Faster Database Operations:** Optimize SQLite relational queries using strategic B-Tree indexing, parameterized execution, selective column projection, and optimized connection settings (`PRAGMA foreign_keys = ON`, `row_factory`).
-4. **Efficient Reporting:** Deploy vectorized data processing via `pandas` to aggregate and generate comprehensive inventory, overdue, and borrowing summaries in under 200 milliseconds.
+3. **Faster Database Operations:** Optimize SQLite queries using strategic B-Tree and FTS5 trigram indexes, parameterized execution, selective column projection, and suitable connection settings (`PRAGMA foreign_keys = ON`, `row_factory`).
+4. **Efficient Reporting:** Use SQL aggregation to generate inventory, overdue, and borrowing summaries in under 200 milliseconds.
 5. **Centralized Operational Dashboard:** Provide an interactive graphical dashboard presenting vital library statistics (total books, active loans, overdue items, performance latency indicators) refreshed in real-time.
 6. **CSV-Based Bulk Data Import:** Create a high-throughput batch import pipeline capable of parsing, validating, and ingesting over 1,000 book records per second in a single atomic transaction.
 7. **Overall Improvement in Software Performance:** Establish quantitative baselines, eliminate software wait states, and demonstrate measurable latency reductions in accordance with BBAT104 TQM evaluation guidelines.
@@ -88,7 +88,7 @@ The project is driven by seven core technical and quality objectives:
 ### 5.2 Member Management (FR-MM)
 - **FR-MM-01 (Register Member):** The system shall allow creation of member accounts with unique username, full name, email, and assigned role (`student` or `admin`).
 - **FR-MM-02 (Authentication & Role Verification):** The system shall authenticate users before granting access to administrative or circulation features.
-- **FR-MM-03 (Member Profile & Loan History):** The system shall allow retrieval of a member's complete active and historical loan records.
+- **FR-MM-03 (Member Profile & Loan History):** The system shall allow administrators to retrieve a member's complete active and historical loan records; students may retrieve only their own loan history.
 
 ### 5.3 Book Search (FR-BS)
 - **FR-BS-01 (Multi-Attribute Search):** The system shall execute search queries across book titles, authors, and ISBNs simultaneously.
@@ -101,9 +101,10 @@ The project is driven by seven core technical and quality objectives:
 - **FR-BI-02 (Duplicate Loan Prevention):** The system shall verify that the user does not currently hold an unreturned copy of the exact same book.
 - **FR-BI-03 (Atomic Checkout Execution):** The system shall execute borrow record creation and copy count decrement within an atomic database transaction.
 - **FR-BI-04 (Due Date Computation):** The system shall compute a default loan period (e.g., 14 days) and record the timestamped due date.
+- **FR-BI-05 (Loan Duration Validation):** The system shall accept loan durations from 1 through 90 days and reject values outside that range.
 
 ### 5.5 Book Return (FR-BR)
-- **FR-BR-01 (Active Loan Lookup):** The system shall allow librarians to look up active loans by member ID, username, or book title.
+- **FR-BR-01 (Active Loan Lookup):** The system shall allow administrators to look up active loans across members; students may access only their own active loans.
 - **FR-BR-02 (Automated Overdue Fine Calculation):** The system shall compare the return date against the due date and automatically compute overdue fines according to standard library policy ($1.00 per day overdue).
 - **FR-BR-03 (Inventory Restitution):** The system shall increment `available_copies` and mark the borrow record status as `RETURNED` atomically.
 - **FR-BR-04 (Transaction Logging):** The system shall record return timestamps, fines levied, and audit event details.
@@ -115,7 +116,7 @@ The project is driven by seven core technical and quality objectives:
 ### 5.7 Operational Dashboard (FR-DB)
 - **FR-DB-01 (Summary KPI Cards):** The system shall calculate and display total books in catalog, total active loans, total registered members, and overdue loan counts.
 - **FR-DB-02 (Performance Metric Display):** The dashboard shall display average search latency and query execution performance statistics.
-- **FR-DB-03 (Visual Charts):** The dashboard shall render graphical distribution charts (e.g., books per category, loan status breakdown) using Matplotlib.
+- **FR-DB-03 (Visual Charts):** The browser dashboard shall render graphical distribution charts (e.g., books per category and loan status) using Chart.js.
 
 ### 5.8 Reports Generation (FR-RP)
 - **FR-RP-01 (Overdue Loan Report):** The system shall generate a dedicated report of all active loans whose due date is prior to the current system date.
@@ -131,7 +132,7 @@ The project is driven by seven core technical and quality objectives:
 
 ### 5.10 Database Operations (FR-DO)
 - **FR-DO-01 (Automated Schema Initialization):** The system shall automatically verify and create required relational tables and indexes upon application startup.
-- **FR-DO-02 (Default Seed Data):** If the database is newly created, the system shall seed default administrative credentials and foundational book records.
+- **FR-DO-02 (Initial Accounts):** A new development database shall seed demo accounts and foundational book records. Production initialization shall require a configured administrator password and shall not seed demo accounts.
 - **FR-DO-03 (Referential Integrity):** The system shall enforce foreign key constraints with cascade behaviors where appropriate.
 
 ---
@@ -143,13 +144,13 @@ The assigned Quality Goal for this project is **Q02 Improve Performance**. Under
 Below is the detailed specification of the five assigned Q02 features:
 
 ### 6.1 Feature 1: Fast Search
-- **What it does:** Provides a rapid, multi-criteria catalog search engine that queries titles, authors, and ISBNs with substring and prefix matching, supported by dedicated SQLite B-Tree indices and selective column projections.
+- **What it does:** Provides case-insensitive substring search across titles, authors, and ISBNs using an SQLite FTS5 trigram index for queries of at least three characters. Shorter queries retain a `LIKE` fallback; category filters use a B-Tree index.
 - **Why it is required:** Catalog searching is the single most frequent operation performed by both library patrons and counter librarians. Inefficient searches lock database connections and stall the user interface.
-- **What problem it solves:** Eliminates sluggish, linear full-table scans (`O(N)` complexity) and reduces memory overhead caused by unrestricted `SELECT *` statements.
-- **Expected improvement:** Achieves catalog search execution latency under **50 ms** for catalogs up to 10,000 records, delivering an estimated 70% reduction in query response time compared to unindexed scans.
+- **What problem it solves:** Avoids linear scans for common substring searches while retaining short-query matching and selective column projection.
+- **Expected improvement:** Meets the **50 ms** search target. The current benchmark measures 3,000 synthetic catalog records; 10,000-record latency is a target, not a measured result.
 
 ### 6.2 Feature 2: Optimized Reports
-- **What it does:** Employs SQL group-by pushdown and `pandas` vectorized data frame processing to calculate inventory distributions, overdue fines, and borrowing summaries in bulk.
+- **What it does:** Uses SQL aggregation and Pandas processing to calculate inventory distributions, overdue fines, and borrowing summaries in bulk.
 - **Why it is required:** Routine management reporting often processes thousands of historic circulation records. Row-by-row iteration in Python causes UI freeze and high CPU utilization.
 - **What problem it solves:** Solves the classic "N+1 query problem" and eliminates nested procedural loops during statistical aggregation.
 - **Expected improvement:** Reduces complex report generation time to under **200 ms**, ensuring seamless data exports and instant report grid population.
@@ -167,10 +168,10 @@ Below is the detailed specification of the five assigned Q02 features:
 - **Expected improvement:** Uses parameterized SQLite `executemany()` encapsulated within a single transaction commit, achieving ingestion throughput of **over 1,000 records per second**.
 
 ### 6.5 Feature 5: Efficient Database Queries
-- **What it does:** Restructures database interactions across the entire codebase to utilize explicit B-Tree indexing on primary and foreign keys, parameterized queries, connection pooling/reuse, and row factories (`sqlite3.Row`).
+- **What it does:** Uses parameterized queries, selective projections, B-Tree indexes for frequent filters/lookups, an FTS5 trigram index for substring search, short-lived SQLite connections, and row factories (`sqlite3.Row`).
 - **Why it is required:** The database is the underlying engine for all circulation and search features; unoptimized queries compound latency throughout the application layer.
-- **What problem it solves:** Prevents table locking, eliminates SQL injection vulnerabilities, avoids expensive full-table scans, and removes unnecessary data conversion overhead.
-- **Expected improvement:** Reduces overall database query execution times by **60% to 80%**, maintaining consistent sub-10 ms execution for single-record lookups and updates.
+- **What problem it solves:** Avoids unnecessary scans for indexed search patterns and limits data conversion overhead.
+- **Expected improvement:** The current benchmark records single-record ISBN lookup below **10 ms**. A percentage reduction versus a measured baseline has not been established.
 
 ---
 
@@ -179,7 +180,7 @@ Below is the detailed specification of the five assigned Q02 features:
 ### 7.1 Performance (NFR-PF)
 - **NFR-PF-01:** Catalog search operations shall return results within **50 milliseconds** under standard local catalog workloads.
 - **NFR-PF-02:** Issue and return circulation transactions shall complete execution within **50 milliseconds** from user trigger to database commit.
-- **NFR-PF-03:** Batch CSV import shall ingest at a minimum rate of **500 records per second** (target > 1,000 records/sec).
+- **NFR-PF-03:** Batch CSV import shall ingest at a minimum rate of **1,000 records per second**.
 - **NFR-PF-04:** Application startup and database initialization shall complete within **2.0 seconds** on standard target hardware.
 
 ### 7.2 Reliability & Fault Tolerance (NFR-RE)
@@ -247,11 +248,11 @@ Below is the detailed specification of the five assigned Q02 features:
 ### 9.3 Implementation Status Distinction
 - **Review 1 Baseline Deliverables (Preserved):** Core SQLite schema, password hashing, role-based login, and foundational TQM documentation.
 - **Review 2 Completed Implementation (Verified):**
-  - **Fast Search:** B-Tree indexed multi-attribute substring matching (Mean latency: **1.05 ms**, Target: $\le$ 50 ms).
-  - **Optimized Reports:** 5 vectorized management summaries with one-click CSV export (Mean latency: **5.91 ms**, Target: $\le$ 200 ms).
-  - **Operational Dashboard:** Real-time KPI control center with Chart.js visual distribution charts (Mean latency: **1.44 ms**, Target: $\le$ 100 ms).
-  - **High-Throughput CSV Import:** Batch ingestion pipeline achieving **184,869.8 records/sec** (Target: $\ge$ 1,000 rec/sec).
-  - **Efficient Database Queries:** 7 strategic B-Tree indexes, WAL mode, row factories, and atomic single-step transactions (Point lookup: **0.003 ms**, Target: $\le$ 10 ms).
+  - **Fast Search:** FTS5 trigram-indexed multi-attribute substring matching for searches of 3+ characters, with a short-query fallback (mean latency: **2.14 ms**, target: $\le$ 50 ms).
+  - **Optimized Reports:** 5 SQL/Pandas management summaries with CSV export (mean latency: **9.27 ms**, target: $\le$ 200 ms).
+  - **Operational Dashboard:** Real-time KPI control center with Chart.js distribution charts (mean aggregation time: **2.08 ms**, target: $\le$ 100 ms).
+  - **High-Throughput CSV Import:** Validated batch ingestion pipeline achieving **16,218.3 records/sec** (target: $\ge$ 1,000 rec/sec).
+  - **Efficient Database Queries:** Seven B-Tree indexes, WAL mode, row factories, and atomic transactions (point lookup: **0.004 ms**, target: $\le$ 10 ms).
   - **Web Application Tier:** Fully responsive browser interface built on Flask and Tailwind CSS with Gunicorn production server and `/health` monitoring endpoint.
 
 ---
@@ -325,6 +326,7 @@ To guarantee high-speed query execution, the following indexes are specified:
 4. `CREATE INDEX idx_borrow_lookup ON borrow_records(user_id, book_id, status);`
 5. `CREATE INDEX idx_borrow_due_status ON borrow_records(status, due_date);`
 6. `CREATE INDEX idx_metrics_timestamp ON search_metrics(timestamp);`
+7. `books_search`: FTS5 trigram virtual table indexed over book title, author, and ISBN for substring queries of at least three characters. The SQLite build must provide FTS5 and the trigram tokenizer.
 
 ---
 
@@ -341,7 +343,7 @@ To guarantee high-speed query execution, the following indexes are specified:
 ### 11.2 System Outputs
 1. **Search Results Grid:** Dynamically populated tabular view showing matching books, author names, ISBNs, categories, and real-time available copies.
 2. **Circulation Confirmation:** Visual success prompts showing transaction ID, due date, or computed fine amount.
-3. **Dashboard KPI Visualizations:** Numeric metric tiles and embedded Matplotlib distribution charts.
+3. **Dashboard KPI Visualizations:** Numeric metric tiles and embedded Chart.js distribution charts; the desktop SQC view uses Matplotlib.
 4. **Analytical Reports:** Structured tabular reports and formatted exported CSV data files.
 5. **SQC Performance Charts:** Control charts (Individual X-Chart) plotting query latency values against Upper Control Limits (UCL), Mean ($\bar{X}$), and Lower Control Limits (LCL).
 6. **Audit & Error Messages:** Modal warning dialogues explaining validation errors or system statuses.
@@ -349,32 +351,28 @@ To guarantee high-speed query execution, the following indexes are specified:
 ---
 
 ## 12. Performance Requirements (Q02 Focused)
-
-As the assigned Quality Goal is **Q02 Improve Performance**, the system establishes the following testable performance criteria:
-
-## 12. Performance Requirements (Q02 Focused)
  
- As the assigned Quality Goal is **Q02 Improve Performance**, the system establishes the following testable performance criteria and verifies them through automated benchmarking:
+The following measurements are from `python benchmark.py` against 3,000 synthetic books, 300 members, and 1,000 circulation records, with a 2,000-row CSV ingestion run:
  
--| Metric Category | Baseline / Unoptimized State | Proposed Q02 Target Benchmark | Measured Result (Mean) | Verification Status |
-+|---|---|---|---|---|
-+| **Catalog Search Latency** | 120 ms – 350 ms (linear scan, full table scan) | **$\le$ 50 ms** for 10,000 catalog entries | **1.05 ms** (95th %ile: 1.49 ms) | **PASS** |
-+| **Issue / Return Transaction** | 100 ms – 250 ms (separate unindexed lookups) | **$\le$ 50 ms** atomic single-step commit | **0.41 ms** (95th %ile: 0.48 ms) | **PASS** |
-+| **Bulk CSV Import Throughput** | 15–30 records/sec (individual commits per row) | **$\ge$ 1,000 records/sec** (batch `executemany`) | **184,869.8 rec/sec** (2,000 in 10.8 ms) | **PASS** |
-+| **Report Generation Time** | 400 ms – 1,200 ms (nested Python iterative loops) | **$\le$ 200 ms** (Pandas vectorized aggregation) | **5.91 ms** (95th %ile: 6.14 ms) | **PASS** |
-+| **Dashboard Load Time** | 300 ms – 700 ms (disjoint full table queries) | **$\le$ 100 ms** (indexed count aggregations) | **1.44 ms** (95th %ile: 1.52 ms) | **PASS** |
-+| **Database Single-Record Lookup** | 20 ms – 50 ms (unindexed search) | **$\le$ 10 ms** (B-Tree indexed lookup) | **0.003 ms** (Direct B-Tree seek) | **PASS** |
- 
--> *Note: Targets are established as formal engineering specifications quantitatively validated during Review 2 testing and benchmarking.*
+| Metric Category | Proposed Q02 Target | Measured Result (Mean) | 95th Percentile / Total | Verification Status |
+|---|---|---:|---:|---|
+| **Catalog Search Latency** | **$\le$ 50 ms** | **2.14 ms** | 4.08 ms | **PASS** |
+| **Issue / Return Transaction** | **$\le$ 50 ms** | **0.91 ms** | 1.02 ms | **PASS** |
+| **Bulk CSV Import Throughput** | **$\ge$ 1,000 records/sec** | **16,218.3 records/sec** | 123.3 ms total | **PASS** |
+| **Report Generation Time** | **$\le$ 200 ms** | **9.27 ms** | 11.65 ms | **PASS** |
+| **Dashboard Load Time** | **$\le$ 100 ms** | **2.08 ms** | 3.01 ms | **PASS** |
+| **Database Single-Record Lookup** | **$\le$ 10 ms** | **0.004 ms** | 0.005 ms | **PASS** |
+*These figures are local benchmark results, not a guarantee for other hosts or larger datasets. Search latency at 10,000 records has not been measured.*
 
 ---
 
 ## 13. Constraints
 
-1. **Local Desktop Architecture:** The system is constrained to a single-host desktop environment without a client-server distributed backend.
+1. **Single-host deployment:** The Flask application can be served through WSGI in a browser; SQLite remains a local file and does not support multi-host shared-database deployment.
 2. **SQLite Concurrency Model:** SQLite uses database-level locking for write operations; multi-threading must coordinate write access through sequential transactional execution.
-3. **Offline Operation:** The system operates in a standalone, offline environment without dependencies on external cloud APIs or third-party web services.
-4. **GUI Framework Constraints:** Built using Tkinter/CustomTkinter to ensure zero-overhead desktop execution across all university lab operating systems.
+3. **Browser asset delivery:** The browser interface loads Tailwind CSS and Chart.js from public CDNs; its styling and charts require outbound browser access.
+4. **Optional desktop GUI:** Tkinter/CustomTkinter remains available as a backward-compatible local interface; the browser interface is the primary Review 2 application.
+5. **Cloud database persistence:** Cloud deployments must mount persistent storage and set `DATABASE_PATH` to its mount location to retain SQLite data across instance replacement.
 
 ---
 

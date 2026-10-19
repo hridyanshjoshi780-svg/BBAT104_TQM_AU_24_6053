@@ -24,17 +24,17 @@
 
 | Mandatory Feature / Requirement | Category | Implementation & Evidence | Status |
 |---|---|---|---|
-| **1. Fast Search** | Q02 Feature 1 | B-Tree indexed multi-attribute substring/prefix search across Title, Author, ISBN, Category & Availability. Selective projection; query plans verified (`EXPLAIN QUERY PLAN`). Average latency: **1.05 ms** (Target: &le; 50 ms). | **PASS** |
-| **2. Optimized Reports** | Q02 Feature 2 | 5 functional management reports (Inventory Distribution, Currently Issued, Overdue Books, Circulation Activity, Member Summary) with SQL pushdown and one-click RFC-4180 CSV export. Latency: **5.91 ms** (Target: &le; 200 ms). | **PASS** |
-| **3. Centralized Dashboard** | Q02 Feature 3 | Real-time control center with 8 dynamic KPI tiles, Chart.js category distribution bar chart, circulation status doughnut chart, and activity stream. Latency: **1.44 ms** (Target: &le; 100 ms). | **PASS** |
-| **4. Bulk CSV Import** | Q02 Feature 4 | High-throughput batch ingestion pipeline with header validation, duplicate ISBN skipping, and atomic transaction commit (`executemany`). Throughput: **184,869 records/sec** (Target: &ge; 1,000 rec/sec). | **PASS** |
-| **5. Efficient Database Queries** | Q02 Feature 5 | 7 dedicated B-Tree indexes, SQLite WAL mode (`PRAGMA journal_mode = WAL`), row factories, parameterized execution, zero N+1 queries. Single-record seek latency: **0.003 ms** (Target: &le; 10 ms). | **PASS** |
+| **1. Fast Search** | Q02 Feature 1 | SQLite FTS5 trigram index for case-insensitive substring searches of 3+ characters, with a short-query fallback; category filtering uses a B-Tree index. `EXPLAIN QUERY PLAN` confirms indexed execution. Mean latency: **2.14 ms** (Target: &le; 50 ms). | **PASS** |
+| **2. Optimized Reports** | Q02 Feature 2 | 5 management reports (Inventory Distribution, Currently Issued, Overdue Books, Circulation Activity, Member Summary) with SQL aggregation and CSV export. Mean generation time: **9.27 ms** (Target: &le; 200 ms). | **PASS** |
+| **3. Centralized Dashboard** | Q02 Feature 3 | Real-time control center with KPI tiles, Chart.js charts, and an activity stream; metrics are read from a consistent database snapshot. Mean aggregation time: **2.08 ms** (Target: &le; 100 ms). | **PASS** |
+| **4. Bulk CSV Import** | Q02 Feature 4 | Batch ingestion with strict headers, positive-copy validation, BOM support, duplicate skipping, row/file limits, and atomic `executemany`. Throughput: **16,218.3 records/sec** (Target: &ge; 1,000 rec/sec). | **PASS** |
+| **5. Efficient Database Queries** | Q02 Feature 5 | Parameterized queries, selective projections, seven B-Tree indexes, WAL mode, and indexed substring search. Single-record lookup mean: **0.004 ms** (Target: &le; 10 ms). | **PASS** |
 | **Book & Catalog CRUD** | Core System | Add book, view details, update metadata/stock, delete/archive with active loan protection safeguards. | **PASS** |
 | **Member Management CRUD** | Core System | Register members, edit profiles, role assignment (`admin`/`student`), safe deletion restricted if active loans exist. | **PASS** |
-| **Atomic Issue & Return** | Core Workflow | Single-step ACID transaction (`BEGIN IMMEDIATE`), concurrency race protection, automatic $1.00/day overdue fine computation. Latency: **0.41 ms** (Target: &le; 50 ms). | **PASS** |
+| **Atomic Issue & Return** | Core Workflow | Single-step ACID transaction (`BEGIN IMMEDIATE`), concurrency race protection, bounded 1–90 day loan duration, and consistent overdue fine estimates. Mean latency: **0.91 ms** (Target: &le; 50 ms). | **PASS** |
 | **Browser Web Interface** | Usability | Responsive dark UI built with Flask, HTML5, Tailwind CSS, and Chart.js. Fully responsive across desktop, tablet, and mobile. | **PASS** |
-| **Automated Testing Suite** | QA Engineering | 25 automated unit and integration tests executing against an isolated temporary database with 100% pass rate in 0.28 seconds. | **PASS** |
-| **Production Deployment Config** | Deployment | Configured with `Procfile`, `render.yaml`, `Dockerfile`, `.env.example`, WSGI production entry point (`wsgi.py`), and `/health` monitoring endpoint. | **PASS** |
+| **Automated Testing Suite** | QA Engineering | 33 unit and integration tests run against an isolated temporary database. | **PASS** |
+| **Production Deployment Config** | Deployment | `Procfile`, `render.yaml`, `Dockerfile`, production WSGI entry point, generated deployment secrets, and `/health` endpoint. Cloud SQLite persistence still requires a mounted persistent disk. | **CONFIGURED; STORAGE LIMITATION DOCUMENTED** |
 
 ---
 
@@ -60,8 +60,8 @@ All official Review 1 deliverables are preserved and synchronized with the Revie
 | **Web Application Server** | Flask 3.1 & Gunicorn 26.2 | Production-ready WSGI application framework providing high responsiveness, clean routing, and low overhead. |
 | **Browser User Interface** | HTML5, Tailwind CSS, Chart.js | Modern responsive browser interface accessible on any device with dark mode aesthetics matching Review 1 specifications. |
 | **Desktop GUI (Backward-Compatible)** | CustomTkinter / Tkinter | Retained for offline single-machine desktop evaluation if preferred. |
-| **Relational Database** | SQLite 3 with WAL Mode | Serverless, zero-configuration, ACID-compliant storage with write-ahead logging and strategic B-Tree indexing. |
-| **Data Processing & Analytics** | Pandas 3.0 & NumPy | Vectorized data processing for analytical reporting, aggregation, and high-throughput CSV parsing. |
+| **Relational Database** | SQLite 3 with FTS5 trigram and WAL mode | ACID-compliant local storage with indexed substring search and strategic B-Tree indexes. SQLite must include FTS5 trigram support. |
+| **Data Processing & Analytics** | Pandas 3.0 & NumPy | Data-frame processing for analytical reports and SQC analysis; CSV import uses the Python standard library. |
 | **Statistical Quality Control** | Matplotlib 3.11 | Generates individual X-charts with Mean, UCL (+3&sigma;), and LCL (-3&sigma;) process control limits. |
 | **Production Deployment** | Docker, Render, Railway, Gunicorn | Declarative cloud hosting configurations supporting public HTTPS and automated health check polling. |
 
@@ -73,14 +73,14 @@ Evaluated against a synthetic dataset of **3,000 catalog books, 300 registered m
 
 | Performance Metric | SRS Target Benchmark | Measured Result (Mean) | 95th Percentile | Evaluation Status |
 |---|---|---|---|---|
-| **1. Fast Catalog Search Latency** | &le; 50.0 ms | **1.05 ms** | 1.49 ms | **PASS** |
-| **2. Issue / Return Transaction** | &le; 50.0 ms | **0.41 ms** | 0.48 ms | **PASS** |
-| **3. Bulk CSV Ingestion Throughput** | &ge; 1,000 records/sec | **184,869.8 rec/s** | 10.8 ms total | **PASS** |
-| **4. Optimized Reports Generation** | &le; 200.0 ms | **5.91 ms** | 6.14 ms | **PASS** |
-| **5. Dashboard Metric Aggregation** | &le; 100.0 ms | **1.44 ms** | 1.52 ms | **PASS** |
-| **6. B-Tree Indexed Point Lookup** | &le; 10.0 ms | **0.003 ms** | 0.004 ms | **PASS** |
+| **1. Fast Catalog Search Latency** | &le; 50.0 ms | **2.14 ms** | 4.08 ms | **PASS** |
+| **2. Issue / Return Transaction** | &le; 50.0 ms | **0.91 ms** | 1.02 ms | **PASS** |
+| **3. Bulk CSV Ingestion Throughput** | &ge; 1,000 records/sec | **16,218.3 rec/s** | 123.3 ms total | **PASS** |
+| **4. Optimized Reports Generation** | &le; 200.0 ms | **9.27 ms** | 11.65 ms | **PASS** |
+| **5. Dashboard Metric Aggregation** | &le; 100.0 ms | **2.08 ms** | 3.01 ms | **PASS** |
+| **6. B-Tree Indexed Point Lookup** | &le; 10.0 ms | **0.004 ms** | 0.005 ms | **PASS** |
 
-*All 6 performance benchmarks meet and significantly exceed the official Review 1 SRS criteria.*
+*All six local benchmark measurements meet the stated targets. Results may vary by host and dataset size.*
 
 ---
 
@@ -108,13 +108,15 @@ pip install -r requirements.txt
 ```
 
 ### 5. Environment Configuration
-Copy the provided environment template:
+Copy the local-development environment template. `run.sh` loads `.env` automatically:
 ```bash
 cp .env.example .env
 ```
-Default parameters in `.env`:
+The template uses development-only demo credentials. Configure these values in the hosting platform for production instead:
 ```ini
-SECRET_KEY=bbat104-library-secret-key-session-2026
+APP_ENV=development
+SECRET_KEY=change-this-local-secret
+ADMIN_PASSWORD=admin123
 PORT=5000
 HOST=0.0.0.0
 FLASK_DEBUG=0
@@ -122,7 +124,7 @@ DATABASE_PATH=library.db
 ```
 
 ### 6. Initialize Database
-The database initializes automatically on first run, or you can run:
+The web application initializes the database on startup, or you can initialize it manually:
 ```bash
 python database.py
 ```
@@ -156,10 +158,10 @@ gunicorn wsgi:application --bind 0.0.0.0:5000 --workers 2 --threads 4
 
 | Role | Username | Password | Access Privileges |
 |---|---|---|---|
-| **Administrator** | `admin` | `admin123` | Full CRUD access to books, members, CSV import, reports, audit logs, and circulation. |
-| **Student (Patron)** | `student1` | `student123` | Catalog browsing, real-time search, personal loan history, and issue/return. |
+| **Administrator** | `admin` | `admin123` | Local development/test only. |
+| **Student (Patron)** | `student1` | `student123` | Local development/test only. |
 
-*Quick login buttons are available directly on the login page for evaluator convenience.*
+Production requires an operator-provided `ADMIN_PASSWORD` and a 32+ character `SECRET_KEY`; it does not seed the demo student account or display demo login shortcuts.
 
 ---
 
@@ -170,7 +172,7 @@ The automated test suite runs against an isolated temporary SQLite database, gua
 ```bash
 python -m unittest test_app.py -v
 ```
-**Results:** `Ran 25 tests in 0.278s &bull; OK`
+**Results:** `Ran 33 tests &bull; OK`
 
 ### 2. Run Quantitative Performance Benchmark
 ```bash
@@ -182,30 +184,22 @@ Measures and prints latency distributions across Search, Circulation, Bulk Inges
 ```bash
 curl -s http://localhost:5000/health
 ```
-Response:
-```json
-{
-  "catalog_count": 7,
-  "database": "connected",
-  "project": "BBAT104 TQM Library Management System",
-  "quality_goal": "Q02 Improve Performance",
-  "roll_number": 31,
-  "status": "healthy",
-  "timestamp": "2026-10-19 16:24:30 UTC"
-}
-```
+The verified healthy response reports `"status": "healthy"`, `"database": "connected"`, and catalog metadata.
+Production-mode WSGI startup and this endpoint were smoke-tested against a temporary database.
 
 ---
 
 ## Production Deployment Preparation
 
-The project is fully prepared for instant public HTTPS cloud deployment:
+The project includes a browser-based deployment configuration. Public hosting has not been verified:
 
 ### 1. Render Deployment (1-Click Blueprint)
 The repository includes [`render.yaml`](render.yaml):
-1. Create a free account at [render.com](https://render.com).
+1. Create a Render account at [render.com](https://render.com).
 2. Connect this GitHub repository.
-3. Select **"Blueprint"** deployment — Render will automatically read `render.yaml`, build the Python environment, configure Gunicorn, and provision a public HTTPS endpoint with automatic SSL.
+3. Select **"Blueprint"** deployment — Render reads `render.yaml`, configures Gunicorn, and generates the production secret and initial administrator password.
+
+> **SQLite persistence:** The blueprint does not configure a persistent disk. SQLite data on the service filesystem can be lost when the instance is replaced or redeployed. Attach a persistent disk and set `DATABASE_PATH` to a path under its mount before relying on cloud data persistence; disk availability and cost depend on the hosting plan.
 
 ### 2. Railway / Fly.io / Heroku Deployment
 The repository includes a standard [`Procfile`](Procfile):
@@ -217,10 +211,10 @@ web: gunicorn wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 4
 The repository includes a production [`Dockerfile`](Dockerfile):
 ```bash
 docker build -t bbat104-library .
-docker run -p 5000:5000 -e SECRET_KEY="your-secret" bbat104-library
+docker run -p 5000:5000 -e APP_ENV=production -e SECRET_KEY="<32+ random characters>" -e ADMIN_PASSWORD="<12+ character password>" bbat104-library
 ```
 
-> **Public Deployment Status:** The application code, WSGI entry point, Procfile, Dockerfile, and health-check endpoint are fully prepared and verified locally via Gunicorn. Actual public cloud deployment requires external hosting account credentials (e.g., Render, Railway, or VPS), which remain pending user authorization and account provisioning.
+> **Public Deployment Status:** No public deployment or public URL has been verified. The local WSGI/health-check verification is reported separately; cloud deployment requires an account and persistent storage configuration.
 
 ---
 
